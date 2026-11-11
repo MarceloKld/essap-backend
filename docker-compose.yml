@@ -1,0 +1,40 @@
+services:
+  # ---------- Base de données ----------
+  postgres:
+    image: postgres:17-alpine              # alpine = image légère
+    container_name: essap_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}      # ces ${...} sont lus dans le fichier .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"              # 127.0.0.1 = accessible UNIQUEMENT depuis ton PC
+    volumes:
+      - essap_pgdata:/var/lib/postgresql/data                       # données conservées
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro       # scripts d'init (lecture seule)
+    healthcheck:                           # Docker vérifie que la base répond vraiment
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- Redis : cache, limitation de débit, files de tâches ----------
+  redis:
+    image: redis:7-alpine
+    container_name: essap_redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - essap_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  essap_pgdata:
+  essap_redisdata:
