@@ -18,14 +18,18 @@ import { ChangerMotDePasseDto } from './dto/changer-mot-de-passe.dto.js';
 @ApiTags('Authentification')
 @Controller('auth')
 export class AuthController {
-  private readonly origineAutorisee: string;
+  private readonly originesAutorisees: string[];
   private readonly cookiesSecurises: boolean;
 
   constructor(
     private readonly auth: AuthService,
     config: ConfigService,
   ) {
-    this.origineAutorisee = new URL(config.getOrThrow<string>('FRONTEND_URL')).origin;
+    this.originesAutorisees = [new URL(config.getOrThrow<string>('FRONTEND_URL')).origin];
+    // En développement, Swagger (servi par l'API elle-même) peut aussi appeler ces routes.
+    if (config.get('NODE_ENV') !== 'production') {
+      this.originesAutorisees.push(`http://localhost:${config.get('PORT') ?? 4000}`);
+    }
     this.cookiesSecurises = String(config.get('COOKIES_SECURISES')) === 'true';
   }
 
@@ -173,7 +177,7 @@ export class AuthController {
    */
   private verifierOrigine(req: Request): void {
     const origine = req.headers.origin;
-    if (origine && origine !== this.origineAutorisee) throw new ForbiddenException('Origine non autorisée.');
+    if (origine && !this.originesAutorisees.includes(origine)) throw new ForbiddenException('Origine non autorisée.');
   }
 
   private contexte(req: Request): ContexteRequete {

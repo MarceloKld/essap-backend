@@ -1,5 +1,5 @@
 // ============================================================
-//  FINANCES : frais, tranches, devises, paiements, reÃƒÂ§us
+//  FINANCES : frais, tranches, devises, paiements, reçus
 // ============================================================
 
 model CategorieFrais {
@@ -14,7 +14,7 @@ model CategorieFrais {
   @@map("categories_frais")
 }
 
-// Un frais = Ã‚Â« Minerval L1 2026-2027 Ã‚Â», avec son montant total et sa devise.
+// Un frais = « Minerval L1 2026-2027 », avec son montant total et sa devise.
 model Frais {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   institutId  Int      @map("institut_id")
@@ -41,7 +41,7 @@ model Frais {
   @@map("frais")
 }
 
-// Tranche, et sous-tranche grÃƒÂ¢ce ÃƒÂ  parent_id (une tranche peut contenir des sous-tranches).
+// Tranche, et sous-tranche grâce à parent_id (une tranche peut contenir des sous-tranches).
 model Tranche {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fraisId    String    @map("frais_id") @db.Uuid
@@ -78,7 +78,7 @@ model TauxChange {
   @@map("taux_change")
 }
 
-// Aucune suppression physique : un paiement erronÃƒÂ© est ANNULÃƒâ€° (avec motif), jamais effacÃƒÂ©.
+// Aucune suppression physique : un paiement erroné est ANNULÉ (avec motif), jamais effacé.
 model Paiement {
   id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   institutId     Int            @map("institut_id")
@@ -91,7 +91,7 @@ model Paiement {
   devise          Devise
   tauxChangeId    Int?           @map("taux_change_id")
   mode            ModePaiement   @default(ESPECES)
-  reference       String?        @db.VarChar(80)   // nÃ‚Â° de bordereau, de transaction...
+  reference       String?        @db.VarChar(80)   // n° de bordereau, de transaction...
   statut          StatutPaiement @default(EN_ATTENTE)
   payeLe          DateTime       @map("paye_le") @db.Timestamptz(3)
   valideLe        DateTime?      @map("valide_le") @db.Timestamptz(3)
@@ -118,8 +118,8 @@ model Paiement {
   @@map("paiements")
 }
 
-// Le PDF n'est JAMAIS stockÃƒÂ©. On garde un instantanÃƒÂ© JSON du reÃƒÂ§u : il permet de
-// rÃƒÂ©gÃƒÂ©nÃƒÂ©rer un duplicata identique ÃƒÂ  tout moment (Ã‚Â§8).
+// Le PDF n'est JAMAIS stocké. On garde un instantané JSON du reçu : il permet de
+// régénérer un duplicata identique à tout moment (§8).
 model Recu {
   id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   numero              String     @unique @db.VarChar(40)
@@ -132,7 +132,7 @@ model Recu {
   generePar           String?    @map("genere_par") @db.Uuid
 
   paiement    Paiement @relation(fields: [paiementId], references: [id])
-  // Ce reÃƒÂ§u a ÃƒÂ©tÃƒÂ© remplacÃƒÂ© PAR un autre (remplacePar) ; inversement, "remplace" est l'ancien reÃƒÂ§u.
+  // Ce reçu a été remplacé PAR un autre (remplacePar) ; inversement, "remplace" est l'ancien reçu.
   remplacePar Recu?    @relation("RemplacementRecu", fields: [remplaceParId], references: [id], onDelete: Restrict)
   remplace    Recu?    @relation("RemplacementRecu")
 

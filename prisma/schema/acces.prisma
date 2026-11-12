@@ -1,8 +1,8 @@
 // ============================================================
-//  ACCÃƒË†S ET SÃƒâ€°CURITÃƒâ€°
+//  ACCÈS ET SÉCURITÉ
 // ============================================================
 
-// RÃƒÂ´les : SUPER_ADMIN, DG, SGAC, ADMIN_BUDGET, ETUDIANT
+// Rôles : SUPER_ADMIN, DG, SGAC, ADMIN_BUDGET, ETUDIANT
 model Role {
   id          Int     @id @default(autoincrement())
   code        String  @unique @db.VarChar(30)
@@ -15,10 +15,10 @@ model Role {
 }
 
 // Le personnel : Super Admin, DG, SGAC, Administrateur du Budget.
-// On peut se connecter avec le nom d'utilisateur, l'email OU le tÃƒÂ©lÃƒÂ©phone (Ã‚Â§3 de ton cahier).
+// On peut se connecter avec le nom d'utilisateur, l'email OU le téléphone (§3 de ton cahier).
 model Utilisateur {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  institutId           Int?      @map("institut_id") // vide = accÃƒÂ¨s ÃƒÂ  toutes les instituts (DG, Super Admin)
+  institutId           Int?      @map("institut_id") // vide = accès à toutes les instituts (DG, Super Admin)
   roleId                Int       @map("role_id")
   nomUtilisateur        String    @unique @map("nom_utilisateur") @db.VarChar(50)
   email                 String?   @unique @db.VarChar(150)
@@ -47,8 +47,8 @@ model Utilisateur {
   @@map("utilisateurs")
 }
 
-// Compte ÃƒÂ©tudiant : PAS de mot de passe. Connexion = matricule + date de naissance.
-// On garde quand mÃƒÂªme un compteur d'ÃƒÂ©checs pour bloquer les attaques.
+// Compte étudiant : PAS de mot de passe. Connexion = matricule + date de naissance.
+// On garde quand même un compteur d'échecs pour bloquer les attaques.
 model CompteEtudiant {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   etudiantId          String    @unique @map("etudiant_id") @db.Uuid
@@ -65,12 +65,12 @@ model CompteEtudiant {
   @@map("comptes_etudiants")
 }
 
-// Refresh tokens. On stocke l'EMPREINTE (hash SHA-256), jamais le jeton lui-mÃƒÂªme :
+// Refresh tokens. On stocke l'EMPREINTE (hash SHA-256), jamais le jeton lui-même :
 // si la base fuit, les jetons restent inutilisables.
 //
-// famille_id : tous les jetons issus d'un mÃƒÂªme login partagent une famille.
-// utilise_le : rempli quand le jeton a servi (rotation). S'il est prÃƒÂ©sentÃƒÂ© une 2e fois,
-//              c'est un vol probable -> on rÃƒÂ©voque TOUTE la famille.
+// famille_id : tous les jetons issus d'un même login partagent une famille.
+// utilise_le : rempli quand le jeton a servi (rotation). S'il est présenté une 2e fois,
+//              c'est un vol probable -> on révoque TOUTE la famille.
 model JetonRafraichissement {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   familleId        String    @map("famille_id") @db.Uuid
@@ -96,7 +96,7 @@ model JetonRafraichissement {
 }
 
 // Journal d'audit : on y AJOUTE des lignes, on n'en modifie ni n'en supprime jamais.
-// (On verrouillera cela dans la base elle-mÃƒÂªme, par un dÃƒÂ©clencheur, ÃƒÂ  l'ÃƒÂ©tape B4.)
+// (On verrouillera cela dans la base elle-même, par un déclencheur, à l'étape B4.)
 model JournalAudit {
   id            BigInt   @id @default(autoincrement())
   utilisateurId String?  @map("utilisateur_id") @db.Uuid
@@ -106,7 +106,7 @@ model JournalAudit {
   entiteId      String?  @map("entite_id") @db.VarChar(60)
   details       Json?
   avant         Json?    // valeurs avant modification
-  apres         Json?    // valeurs aprÃƒÂ¨s modification
+  apres         Json?    // valeurs après modification
   adresseIp     String?  @map("adresse_ip") @db.VarChar(45)
   appareil      String?  @db.VarChar(255)
   creeLe        DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)

@@ -1,0 +1,11 @@
+{
+  "errorLens.enabledDiagnosticLevels": ["error", "warning"],
+  "errorLens.excludeBySource": ["cSpell"],
+  "cSpell.language": "en,fr",
+  "cSpell.diagnosticLevel": "Hint",
+  "cSpell.ignorePaths": ["node_modules", "src/generated", "prisma/migrations", "package-lock.json", "postman", ".vscode"],
+  "cSpell.words": [
+    "essap", "sgac", "prisma", "nestjs", "argon", "jwt", "pino", "upsert", "citext", "unaccent",
+    "pgcrypto", "timestamptz", "dbgenerated", "postnom", "tsx", "dotenv", "throttler", "helmet", "swagger"
+  ]
+}

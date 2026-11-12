@@ -50,7 +50,9 @@ async function demarrer() {
       .setVersion('1.0')
       .addBearerAuth() // bouton Â« Authorize Â» pour coller un access token
       .build();
-    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, options));
+    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, options), {
+      swaggerOptions: { persistAuthorization: true }, // garde le jeton après un F5
+    });
   }
 
   // ArrÃªt propre (ferme les connexions base/Redis quand on coupe le serveur)
