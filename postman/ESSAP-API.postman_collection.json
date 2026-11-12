@@ -1,0 +1,156 @@
+{
+  "info": {
+    "name": "ESSAP API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Rafraîchit AUTOMATIQUEMENT le jeton d'accès quand il est expiré (ou proche de l'être).",
+          "var sansJeton = ['/auth/connexion', '/auth/connexion-etudiant', '/auth/rafraichir', '/auth/deconnexion', '/sante'];",
+          "var chemin = pm.request.url.getPath();",
+          "var ignorer = sansJeton.some(function (c) { return chemin.endsWith(c); });",
+          "var expire = Number(pm.environment.get('accessExpireAt') || 0);",
+          "if (!ignorer && Date.now() > expire - 30000) {",
+          "  pm.sendRequest({ url: pm.environment.get('baseUrl') + '/api/v1/auth/rafraichir', method: 'POST' }, function (err, res) {",
+          "    if (!err && res.code === 200) {",
+          "      var j = res.json();",
+          "      pm.environment.set('accessToken', j.jetonAcces);",
+          "      pm.environment.set('accessExpireAt', String(Date.now() + j.expireDansSecondes * 1000));",
+          "    }",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Santé",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/v1/sante", "host": ["{{baseUrl}}"], "path": ["api", "v1", "sante"] }
+      }
+    },
+    {
+      "name": "Connexion personnel",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Après la connexion : on range le jeton d'accès dans l'environnement.",
+              "if (pm.response.code === 200) {",
+              "  var j = pm.response.json();",
+              "  pm.environment.set('accessToken', j.jetonAcces);",
+              "  pm.environment.set('accessExpireAt', String(Date.now() + j.expireDansSecondes * 1000));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"identifiant\": \"superadmin\",\n  \"motDePasse\": \"Essap@Dev2026\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/connexion", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "connexion"] }
+      }
+    },
+    {
+      "name": "Connexion étudiant",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  var j = pm.response.json();",
+              "  pm.environment.set('accessToken', j.jetonAcces);",
+              "  pm.environment.set('accessExpireAt', String(Date.now() + j.expireDansSecondes * 1000));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"matricule\": \"DEMO2026L10001\",\n  \"dateNaissance\": \"2004-03-15\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/connexion-etudiant", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "connexion-etudiant"] }
+      }
+    },
+    {
+      "name": "Rafraîchir le jeton",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  var j = pm.response.json();",
+              "  pm.environment.set('accessToken', j.jetonAcces);",
+              "  pm.environment.set('accessExpireAt', String(Date.now() + j.expireDansSecondes * 1000));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/rafraichir", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "rafraichir"] }
+      }
+    },
+    {
+      "name": "Moi (profil)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/moi", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "moi"] }
+      }
+    },
+    {
+      "name": "Garder le mot de passe temporaire",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/mot-de-passe/garder", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "mot-de-passe", "garder"] }
+      }
+    },
+    {
+      "name": "Changer le mot de passe",
+      "request": {
+        "method": "PATCH",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"motDePasseActuel\": \"Essap@Dev2026\",\n  \"nouveauMotDePasse\": \"NouveauMdp2026\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/mot-de-passe", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "mot-de-passe"] }
+      }
+    },
+    {
+      "name": "Déconnexion",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/deconnexion", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "deconnexion"] }
+      }
+    },
+    {
+      "name": "Déconnexion partout",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/deconnexion-partout", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "deconnexion-partout"] }
+      }
+    }
+  ]
+}
