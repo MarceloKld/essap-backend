@@ -1,0 +1,120 @@
+// ============================================================
+//  ACCÈS ET SÉCURITÉ
+// ============================================================
+
+// Rôles : SUPER_ADMIN, DG, SGAC, ADMIN_BUDGET, ETUDIANT
+model Role {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique @db.VarChar(30)
+  libelle     String  @db.VarChar(80)
+  description String? @db.VarChar(255)
+
+  utilisateurs Utilisateur[]
+
+  @@map("roles")
+}
+
+// Le personnel : Super Admin, DG, SGAC, Administrateur du Budget.
+// On peut se connecter avec le nom d'utilisateur, l'email OU le téléphone (§3 de ton cahier).
+model Utilisateur {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extensionId           Int?      @map("extension_id") // vide = accès à toutes les extensions (DG, Super Admin)
+  roleId                Int       @map("role_id")
+  nomUtilisateur        String    @unique @map("nom_utilisateur") @db.VarChar(50)
+  email                 String?   @unique @db.VarChar(150)
+  telephone             String?   @unique @db.VarChar(30)
+  motDePasseHache       String    @map("mot_de_passe_hache") // JAMAIS le mot de passe en clair : un hash Argon2id
+  nom                   String    @db.VarChar(80)
+  postnom               String?   @db.VarChar(80)
+  prenom                String?   @db.VarChar(80)
+  doitChangerMotDePasse Boolean   @default(true) @map("doit_changer_mot_de_passe") // modale de 1re connexion
+  tentativesEchouees    Int       @default(0) @map("tentatives_echouees")
+  verrouilleJusqua      DateTime? @map("verrouille_jusqua") @db.Timestamptz(3)
+  derniereConnexionLe   DateTime? @map("derniere_connexion_le") @db.Timestamptz(3)
+  actif                 Boolean   @default(true)
+  creePar               String?   @map("cree_par") @db.Uuid
+  creeLe                DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe             DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
+  supprimeLe            DateTime? @map("supprime_le") @db.Timestamptz(3)
+
+  extension              Extension?              @relation(fields: [extensionId], references: [id])
+  role                   Role                    @relation(fields: [roleId], references: [id])
+  jetonsRafraichissement JetonRafraichissement[]
+  journalAudit           JournalAudit[]
+
+  @@index([extensionId, roleId])
+  @@map("utilisateurs")
+}
+
+// Compte étudiant : PAS de mot de passe. Connexion = matricule + date de naissance.
+// On garde quand même un compteur d'échecs pour bloquer les attaques.
+model CompteEtudiant {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  etudiantId          String    @unique @map("etudiant_id") @db.Uuid
+  tentativesEchouees  Int       @default(0) @map("tentatives_echouees")
+  verrouilleJusqua    DateTime? @map("verrouille_jusqua") @db.Timestamptz(3)
+  derniereConnexionLe DateTime? @map("derniere_connexion_le") @db.Timestamptz(3)
+  actif               Boolean   @default(true)
+  creeLe              DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe           DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  etudiant               Etudiant                @relation(fields: [etudiantId], references: [id])
+  jetonsRafraichissement JetonRafraichissement[]
+
+  @@map("comptes_etudiants")
+}
+
+// Refresh tokens. On stocke l'EMPREINTE (hash SHA-256), jamais le jeton lui-même :
+// si la base fuit, les jetons restent inutilisables.
+//
+// famille_id : tous les jetons issus d'un même login partagent une famille.
+// utilise_le : rempli quand le jeton a servi (rotation). S'il est présenté une 2e fois,
+//              c'est un vol probable -> on révoque TOUTE la famille.
+model JetonRafraichissement {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  familleId        String    @map("famille_id") @db.Uuid
+  empreinte        String    @unique @db.VarChar(64)
+  utilisateurId    String?   @map("utilisateur_id") @db.Uuid
+  compteEtudiantId String?   @map("compte_etudiant_id") @db.Uuid
+  appareil         String?   @db.VarChar(255)
+  adresseIp        String?   @map("adresse_ip") @db.VarChar(45)
+  expireLe         DateTime  @map("expire_le") @db.Timestamptz(3)
+  utiliseLe        DateTime? @map("utilise_le") @db.Timestamptz(3)
+  revoqueLe        DateTime? @map("revoque_le") @db.Timestamptz(3)
+  motifRevocation  String?   @map("motif_revocation") @db.VarChar(60)
+  creeLe           DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+
+  utilisateur    Utilisateur?    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  compteEtudiant CompteEtudiant? @relation(fields: [compteEtudiantId], references: [id], onDelete: Cascade)
+
+  @@index([familleId])
+  @@index([utilisateurId])
+  @@index([compteEtudiantId])
+  @@index([expireLe])
+  @@map("jetons_rafraichissement")
+}
+
+// Journal d'audit : on y AJOUTE des lignes, on n'en modifie ni n'en supprime jamais.
+// (On verrouillera cela dans la base elle-même, par un déclencheur, à l'étape B4.)
+model JournalAudit {
+  id            BigInt   @id @default(autoincrement())
+  utilisateurId String?  @map("utilisateur_id") @db.Uuid
+  extensionId   Int?     @map("extension_id")
+  action        String   @db.VarChar(60)   // ex. CONNEXION_REUSSIE, PAIEMENT_VALIDE
+  entite        String?  @db.VarChar(60)   // ex. paiements
+  entiteId      String?  @map("entite_id") @db.VarChar(60)
+  details       Json?
+  avant         Json?    // valeurs avant modification
+  apres         Json?    // valeurs après modification
+  adresseIp     String?  @map("adresse_ip") @db.VarChar(45)
+  appareil      String?  @db.VarChar(255)
+  creeLe        DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+
+  utilisateur Utilisateur? @relation(fields: [utilisateurId], references: [id], onDelete: Restrict)
+
+  @@index([utilisateurId, creeLe])
+  @@index([entite, entiteId])
+  @@index([action, creeLe])
+  @@index([creeLe])
+  @@map("journal_audit")
+}

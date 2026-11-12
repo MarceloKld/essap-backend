@@ -1,0 +1,74 @@
+// Une énumération = une liste fermée de valeurs possibles.
+// La base REFUSE toute autre valeur : impossible d'écrire "Valdé" au lieu de "VALIDE".
+
+enum Sexe {
+  M
+  F
+
+  @@map("sexe")
+}
+
+enum StatutEtudiant {
+  CANDIDAT   // a fait une demande en ligne, pas encore finalisée sur place
+  INSCRIT
+  ANCIEN
+  SUSPENDU
+  DIPLOME
+  PARTI
+
+  @@map("statut_etudiant")
+}
+
+enum TypeInscription {
+  INSCRIPTION     // nouvel étudiant (frais d'inscription obligatoires)
+  REINSCRIPTION   // retour d'année en année
+  IMPORTE         // étudiant existant repris avec son historique (sans frais d'inscription)
+
+  @@map("type_inscription")
+}
+
+enum EtatAnnuel {
+  INSCRIT
+  ABSENT
+  ABANDON
+  DIPLOME
+
+  @@map("etat_annuel")
+}
+
+enum NatureFrais {
+  ACADEMIQUE   // apparaît comme dette sur le reçu
+  ANNEXE       // labo, internet, carte... n'apparaît PAS comme dette sur le reçu
+
+  @@map("nature_frais")
+}
+
+enum Devise {
+  FC
+  USD
+
+  @@map("devise")
+}
+
+enum ModePaiement {
+  ESPECES
+  MOBILE_MONEY
+  BANQUE
+
+  @@map("mode_paiement")
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  VALIDE
+  ANNULE
+
+  @@map("statut_paiement")
+}
+
+enum StatutRecu {
+  VALIDE
+  REMPLACE   // remplacé après une modification de paiement (§11)
+
+  @@map("statut_recu")
+}

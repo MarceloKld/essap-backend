@@ -1,11 +1,11 @@
-import * as Joi from 'joi';
+﻿import Joi from 'joi';
 
 /**
- * Schéma de validation des variables d'environnement.
+ * SchÃ©ma de validation des variables d'environnement.
  *
- * Pourquoi c'est important : si une variable manque ou est mal formée,
- * l'application REFUSE de démarrer, avec un message clair. On évite ainsi
- * de découvrir le problème en production, en pleine inscription d'étudiants.
+ * Pourquoi c'est important : si une variable manque ou est mal formÃ©e,
+ * l'application REFUSE de dÃ©marrer, avec un message clair. On Ã©vite ainsi
+ * de dÃ©couvrir le problÃ¨me en production, en pleine inscription d'Ã©tudiants.
  */
 export const schemaEnv = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),

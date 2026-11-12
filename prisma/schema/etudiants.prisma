@@ -1,0 +1,102 @@
+// ============================================================
+//  ÉTUDIANTS ET INSCRIPTIONS
+// ============================================================
+
+// Aucune photo : l'avatar dépend uniquement du sexe (§4 de ton cahier).
+model Etudiant {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extensionId     Int            @map("extension_id")
+  // Le matricule est vide tant que la demande n'est pas finalisée sur place.
+  // Ensuite il est unique, à vie, et jamais réutilisé.
+  matricule       String?        @unique @db.VarChar(30)
+  nom             String         @db.VarChar(80)
+  postnom         String?        @db.VarChar(80)
+  prenom          String?        @db.VarChar(80)
+  sexe            Sexe
+  dateNaissance   DateTime       @map("date_naissance") @db.Date  // 2e facteur de connexion
+  lieuNaissance   String?        @map("lieu_naissance") @db.VarChar(100)
+  nationalite     String?        @db.VarChar(60)
+  telephone       String?        @db.VarChar(30)
+  email           String?        @db.VarChar(150)
+  adresse         String?        @db.VarChar(255)
+  nomTuteur       String?        @map("nom_tuteur") @db.VarChar(150)
+  telephoneTuteur String?        @map("telephone_tuteur") @db.VarChar(30)
+  domaineEtude    String         @default("Assistant en pharmacie") @map("domaine_etude") @db.VarChar(100)
+  statut          StatutEtudiant @default(CANDIDAT)
+  estImporte      Boolean        @default(false) @map("est_importe") // étudiant existant repris
+  creePar         String?        @map("cree_par") @db.Uuid
+  creeLe          DateTime       @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe       DateTime       @updatedAt @map("modifie_le") @db.Timestamptz(3)
+  supprimeLe      DateTime?      @map("supprime_le") @db.Timestamptz(3)
+
+  extension      Extension       @relation(fields: [extensionId], references: [id])
+  compte         CompteEtudiant?
+  inscriptions   Inscription[]
+  statutsAnnuels StatutAnnuel[]
+  paiements      Paiement[]
+
+  @@index([extensionId, matricule])
+  @@index([nom, prenom])
+  @@map("etudiants")
+}
+
+// Inscription = étudiant x année x classe. Un étudiant n'a qu'UNE inscription par année
+// (même s'il redouble : l'année change, donc c'est une autre ligne).
+model Inscription {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  etudiantId      String          @map("etudiant_id") @db.Uuid
+  anneeId         Int             @map("annee_id")
+  classeId        Int             @map("classe_id")
+  extensionId     Int             @map("extension_id")
+  type            TypeInscription
+  dateInscription DateTime        @default(now()) @map("date_inscription") @db.Timestamptz(3)
+  annuleeLe       DateTime?       @map("annulee_le") @db.Timestamptz(3)
+  creePar         String?         @map("cree_par") @db.Uuid
+  creeLe          DateTime        @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe       DateTime        @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  etudiant  Etudiant      @relation(fields: [etudiantId], references: [id])
+  annee     AnneeScolaire @relation(fields: [anneeId], references: [id])
+  classe    Classe        @relation(fields: [classeId], references: [id])
+  extension Extension     @relation(fields: [extensionId], references: [id])
+  paiements Paiement[]
+
+  @@unique([etudiantId, anneeId])
+  @@index([extensionId, anneeId, classeId])
+  @@map("inscriptions")
+}
+
+// Statut de l'étudiant pour chaque année : inscrit, absent, abandon, diplômé.
+// Les années manquantes restent visibles dans le parcours (§16).
+model StatutAnnuel {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  etudiantId String     @map("etudiant_id") @db.Uuid
+  anneeId    Int        @map("annee_id")
+  etat       EtatAnnuel
+  creeLe     DateTime   @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe  DateTime   @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  etudiant Etudiant      @relation(fields: [etudiantId], references: [id])
+  annee    AnneeScolaire @relation(fields: [anneeId], references: [id])
+
+  @@unique([etudiantId, anneeId])
+  @@map("statuts_annuels")
+}
+
+// Compteur de matricules. Une ligne par extension x année x classe.
+// Le service la verrouillera dans une TRANSACTION pour que deux secrétaires
+// ne reçoivent jamais le même numéro (étape B5).
+model SequenceMatricule {
+  id           Int @id @default(autoincrement())
+  extensionId  Int @map("extension_id")
+  anneeId      Int @map("annee_id")
+  classeId     Int @map("classe_id")
+  dernierNumero Int @default(0) @map("dernier_numero")
+
+  extension Extension     @relation(fields: [extensionId], references: [id])
+  annee     AnneeScolaire @relation(fields: [anneeId], references: [id])
+  classe    Classe        @relation(fields: [classeId], references: [id])
+
+  @@unique([extensionId, anneeId, classeId])
+  @@map("sequences_matricule")
+}

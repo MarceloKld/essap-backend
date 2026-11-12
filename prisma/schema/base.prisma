@@ -1,0 +1,11 @@
+// Le générateur crée le client TypeScript dans src/generated/prisma.
+// On le place DANS src/ pour que la compilation Nest l'inclue automatiquement.
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+// L'URL de la base n'est pas ici : elle vient de prisma.config.ts (donc du .env).
+datasource db {
+  provider = "postgresql"
+}

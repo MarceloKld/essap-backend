@@ -1,0 +1,139 @@
+// ============================================================
+//  FINANCES : frais, tranches, devises, paiements, reçus
+// ============================================================
+
+model CategorieFrais {
+  id      Int         @id @default(autoincrement())
+  code    String      @unique @db.VarChar(30)
+  libelle String      @db.VarChar(100)
+  nature  NatureFrais // ACADEMIQUE ou ANNEXE
+  actif   Boolean     @default(true)
+
+  frais Frais[]
+
+  @@map("categories_frais")
+}
+
+// Un frais = « Minerval L1 2026-2027 », avec son montant total et sa devise.
+model Frais {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extensionId  Int      @map("extension_id")
+  anneeId      Int      @map("annee_id")
+  classeId     Int      @map("classe_id")
+  categorieId  Int      @map("categorie_id")
+  libelle      String   @db.VarChar(150)
+  montantTotal Decimal  @map("montant_total") @db.Decimal(14, 2)
+  devise       Devise   @default(USD)
+  actif        Boolean  @default(true)
+  creePar      String?  @map("cree_par") @db.Uuid
+  creeLe       DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe    DateTime @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  extension Extension      @relation(fields: [extensionId], references: [id])
+  annee     AnneeScolaire  @relation(fields: [anneeId], references: [id])
+  classe    Classe         @relation(fields: [classeId], references: [id])
+  categorie CategorieFrais @relation(fields: [categorieId], references: [id])
+  tranches  Tranche[]
+  paiements Paiement[]
+
+  @@unique([extensionId, anneeId, classeId, categorieId, libelle], map: "uq_frais_par_classe")
+  @@index([extensionId, anneeId, classeId])
+  @@map("frais")
+}
+
+// Tranche, et sous-tranche grâce à parent_id (une tranche peut contenir des sous-tranches).
+model Tranche {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fraisId    String    @map("frais_id") @db.Uuid
+  parentId   String?   @map("parent_id") @db.Uuid
+  numero     Int
+  libelle    String    @db.VarChar(100)
+  montant    Decimal   @db.Decimal(14, 2)
+  echeanceLe DateTime? @map("echeance_le") @db.Date
+
+  frais        Frais      @relation(fields: [fraisId], references: [id])
+  parent       Tranche?   @relation("SousTranches", fields: [parentId], references: [id], onDelete: Restrict)
+  sousTranches Tranche[]  @relation("SousTranches")
+  paiements    Paiement[]
+
+  @@index([fraisId])
+  @@map("tranches")
+}
+
+// Historique des taux de change : on ne modifie jamais un taux, on en ajoute un nouveau.
+model TauxChange {
+  id           Int      @id @default(autoincrement())
+  deviseSource Devise   @map("devise_source")
+  deviseCible  Devise   @map("devise_cible")
+  taux         Decimal  @db.Decimal(18, 6)
+  valideDepuis DateTime @map("valide_depuis") @db.Timestamptz(3)
+  creePar      String?  @map("cree_par") @db.Uuid
+  creeLe       DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+
+  paiements Paiement[]
+
+  @@index([deviseSource, deviseCible, valideDepuis])
+  @@map("taux_change")
+}
+
+// Aucune suppression physique : un paiement erroné est ANNULÉ (avec motif), jamais effacé.
+model Paiement {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extensionId     Int            @map("extension_id")
+  anneeId         Int            @map("annee_id")
+  etudiantId      String         @map("etudiant_id") @db.Uuid
+  inscriptionId   String         @map("inscription_id") @db.Uuid
+  fraisId         String         @map("frais_id") @db.Uuid
+  trancheId       String?        @map("tranche_id") @db.Uuid
+  montant         Decimal        @db.Decimal(14, 2)
+  devise          Devise
+  tauxChangeId    Int?           @map("taux_change_id")
+  mode            ModePaiement   @default(ESPECES)
+  reference       String?        @db.VarChar(80)   // n° de bordereau, de transaction...
+  statut          StatutPaiement @default(EN_ATTENTE)
+  payeLe          DateTime       @map("paye_le") @db.Timestamptz(3)
+  valideLe        DateTime?      @map("valide_le") @db.Timestamptz(3)
+  validePar       String?        @map("valide_par") @db.Uuid
+  annuleLe        DateTime?      @map("annule_le") @db.Timestamptz(3)
+  annulePar       String?        @map("annule_par") @db.Uuid
+  motifAnnulation String?        @map("motif_annulation") @db.VarChar(500)
+  creePar         String?        @map("cree_par") @db.Uuid
+  creeLe          DateTime       @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe       DateTime       @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  extension   Extension     @relation(fields: [extensionId], references: [id])
+  annee       AnneeScolaire @relation(fields: [anneeId], references: [id])
+  etudiant    Etudiant      @relation(fields: [etudiantId], references: [id])
+  inscription Inscription   @relation(fields: [inscriptionId], references: [id])
+  frais       Frais         @relation(fields: [fraisId], references: [id])
+  tranche     Tranche?      @relation(fields: [trancheId], references: [id])
+  tauxChange  TauxChange?   @relation(fields: [tauxChangeId], references: [id])
+  recus       Recu[]
+
+  @@index([extensionId, anneeId, etudiantId])
+  @@index([etudiantId, fraisId])
+  @@index([statut, payeLe])
+  @@map("paiements")
+}
+
+// Le PDF n'est JAMAIS stocké. On garde un instantané JSON du reçu : il permet de
+// régénérer un duplicata identique à tout moment (§8).
+model Recu {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  numero              String     @unique @db.VarChar(40)
+  paiementId          String     @map("paiement_id") @db.Uuid
+  statut              StatutRecu @default(VALIDE)
+  snapshot            Json
+  remplaceParId       String?    @unique @map("remplace_par_id") @db.Uuid
+  nombreReimpressions Int        @default(0) @map("nombre_reimpressions")
+  genereLe            DateTime   @default(now()) @map("genere_le") @db.Timestamptz(3)
+  generePar           String?    @map("genere_par") @db.Uuid
+
+  paiement    Paiement @relation(fields: [paiementId], references: [id])
+  // Ce reçu a été remplacé PAR un autre (remplacePar) ; inversement, "remplace" est l'ancien reçu.
+  remplacePar Recu?    @relation("RemplacementRecu", fields: [remplaceParId], references: [id], onDelete: Restrict)
+  remplace    Recu?    @relation("RemplacementRecu")
+
+  @@index([paiementId])
+  @@map("recus")
+}

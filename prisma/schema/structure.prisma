@@ -1,0 +1,78 @@
+// ============================================================
+//  STRUCTURE DE L'INSTITUTION
+// ============================================================
+
+// Une extension = un site de l'ESSAP. Il y en a au moins une (le siège).
+// Seul le DG peut en ajouter. Presque toutes les données portent un extension_id :
+// c'est ce qui permet de cloisonner les sites entre eux.
+model Extension {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique @db.VarChar(20)
+  nom           String    @db.VarChar(150)
+  adresse       String?   @db.VarChar(255)
+  telephone     String?   @db.VarChar(30)
+  email         String?   @db.VarChar(150)
+  estPrincipale Boolean   @default(false) @map("est_principale")
+  actif         Boolean   @default(true)
+  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe     DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
+  supprimeLe    DateTime? @map("supprime_le") @db.Timestamptz(3)
+
+  // Relations inverses : « une extension possède plusieurs... »
+  utilisateurs       Utilisateur[]
+  etudiants          Etudiant[]
+  inscriptions       Inscription[]
+  frais              Frais[]
+  paiements          Paiement[]
+  sequencesMatricule SequenceMatricule[]
+
+  @@map("extensions")
+}
+
+// L'année scolaire est la clé de traçabilité de tout le logiciel (§16).
+model AnneeScolaire {
+  id          Int       @id @default(autoincrement())
+  libelle     String    @unique @db.VarChar(9) // "2026-2027"
+  dateDebut   DateTime  @map("date_debut") @db.Date
+  dateFin     DateTime  @map("date_fin") @db.Date
+  estActive   Boolean   @default(false) @map("est_active")
+  estCloturee Boolean   @default(false) @map("est_cloturee") // clôturée = lecture seule
+  clotureLe   DateTime? @map("cloture_le") @db.Timestamptz(3)
+  creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe   DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  inscriptions       Inscription[]
+  statutsAnnuels     StatutAnnuel[]
+  frais              Frais[]
+  paiements          Paiement[]
+  sequencesMatricule SequenceMatricule[]
+
+  @@map("annees_scolaires")
+}
+
+// Extensible : M1 et M2 s'ajouteront par une simple ligne, sans toucher au code.
+model Classe {
+  id      Int     @id @default(autoincrement())
+  code    String  @unique @db.VarChar(10) // L1, L2, L3, plus tard M1, M2
+  libelle String  @db.VarChar(60)
+  ordre   Int     // 1, 2, 3... sert à savoir quelle est la classe suivante
+  actif   Boolean @default(true)
+
+  inscriptions       Inscription[]
+  frais              Frais[]
+  sequencesMatricule SequenceMatricule[]
+
+  @@map("classes")
+}
+
+// Réglages du logiciel sous forme clé / valeur (format du matricule, seuils, etc.)
+model Parametre {
+  id          Int      @id @default(autoincrement())
+  cle         String   @unique @db.VarChar(80)
+  valeur      Json
+  description String?  @db.VarChar(255)
+  modifiePar  String?  @map("modifie_par") @db.Uuid
+  modifieLe   DateTime @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  @@map("parametres")
+}

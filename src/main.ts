@@ -5,20 +5,20 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { Logger } from 'nestjs-pino';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
 
 async function demarrer() {
-  // bufferLogs : garde les premiers logs en mémoire jusqu'à ce que Pino soit prêt.
+  // bufferLogs : garde les premiers logs en mÃ©moire jusqu'Ã  ce que Pino soit prÃªt.
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
 
   const config = app.get(ConfigService);
   const enProduction = config.get<string>('NODE_ENV') === 'production';
 
-  // --- Sécurité HTTP : en-têtes (anti-clickjacking, sniffing, etc.) ---
+  // --- SÃ©curitÃ© HTTP : en-tÃªtes (anti-clickjacking, sniffing, etc.) ---
   app.use(helmet());
 
-  // --- Cookies : nécessaire pour lire le refresh token HttpOnly (étape B3) ---
+  // --- Cookies : nÃ©cessaire pour lire le refresh token HttpOnly (Ã©tape B3) ---
   app.use(cookieParser());
 
   // --- CORS strict : SEUL notre front a le droit d'appeler l'API depuis un navigateur.
@@ -33,11 +33,11 @@ async function demarrer() {
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
-  // --- Validation GLOBALE de toutes les données entrantes ---
+  // --- Validation GLOBALE de toutes les donnÃ©es entrantes ---
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,            // supprime les champs non déclarés dans le DTO
-      forbidNonWhitelisted: true, // et REFUSE la requête s'il y en a (anti mass-assignment)
+      whitelist: true,            // supprime les champs non dÃ©clarÃ©s dans le DTO
+      forbidNonWhitelisted: true, // et REFUSE la requÃªte s'il y en a (anti mass-assignment)
       transform: true,            // convertit les types ("5" -> 5)
     }),
   );
@@ -45,15 +45,15 @@ async function demarrer() {
   // --- Swagger : documentation, active seulement hors production ---
   if (!enProduction) {
     const options = new DocumentBuilder()
-      .setTitle('ESSAP – API Inscriptions & Paiements')
+      .setTitle('ESSAP â€“ API Inscriptions & Paiements')
       .setDescription("Documentation de l'API REST ESSAP")
       .setVersion('1.0')
-      .addBearerAuth() // bouton « Authorize » pour coller un access token
+      .addBearerAuth() // bouton Â« Authorize Â» pour coller un access token
       .build();
     SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, options));
   }
 
-  // Arrêt propre (ferme les connexions base/Redis quand on coupe le serveur)
+  // ArrÃªt propre (ferme les connexions base/Redis quand on coupe le serveur)
   app.enableShutdownHooks();
 
   const port = config.getOrThrow<number>('PORT');
