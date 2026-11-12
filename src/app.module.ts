@@ -9,6 +9,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
+import { InstitutsModule } from './modules/instituts/instituts.module.js';
 import { SanteModule } from './modules/sante/sante.module.js';
 
 @Module({
@@ -31,6 +32,7 @@ import { SanteModule } from './modules/sante/sante.module.js';
     PrismaModule,
     AuditModule,
     AuthModule,
+    InstitutsModule,
     SanteModule,
   ],
   providers: [

@@ -1,0 +1,1441 @@
+{
+    "info":  {
+                 "name":  "ESSAP - Tests B4a (instituts et isolation)",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "auth":  {
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "type":  "string",
+                                    "value":  "{{accessToken}}"
+                                }
+                            ],
+                 "type":  "bearer"
+             },
+    "event":  [
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "// À coller dans : collection \u003e Scripts \u003e Pre-request",
+                                                  "// Avant CHAQUE requête : rafraîchit le jeton d\u0027accès s\u0027il est expiré (ou proche de l\u0027être).",
+                                                  "var sansJeton = [\u0027/auth/connexion\u0027, \u0027/auth/connexion-etudiant\u0027, \u0027/auth/rafraichir\u0027, \u0027/auth/deconnexion\u0027, \u0027/sante\u0027];",
+                                                  "var chemin = pm.request.url.getPath();",
+                                                  "var ignorer = sansJeton.some(function (c) { return chemin.endsWith(c); });",
+                                                  "var expire = Number(pm.environment.get(\u0027accessExpireAt\u0027) || 0);",
+                                                  "",
+                                                  "if (!ignorer \u0026\u0026 Date.now() \u003e expire - 30000) {",
+                                                  "  pm.sendRequest({ url: pm.environment.get(\u0027baseUrl\u0027) + \u0027/api/v1/auth/rafraichir\u0027, method: \u0027POST\u0027 }, function (err, res) {",
+                                                  "    if (!err \u0026\u0026 res.code === 200) {",
+                                                  "      var j = res.json();",
+                                                  "      pm.environment.set(\u0027accessToken\u0027, j.jetonAcces);",
+                                                  "      pm.environment.set(\u0027accessExpireAt\u0027, String(Date.now() + j.expireDansSecondes * 1000));",
+                                                  "    }",
+                                                  "  });",
+                                                  "}"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "prerequest"
+                  },
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "// À coller dans : collection \u003e Scripts \u003e Post-response",
+                                                  "// Après CHAQUE requête : si la réponse contient un jeton d\u0027accès, on le range dans l\u0027environnement.",
+                                                  "if (pm.response.code === 200) {",
+                                                  "  try {",
+                                                  "    var j = pm.response.json();",
+                                                  "    if (j \u0026\u0026 j.jetonAcces) {",
+                                                  "      pm.environment.set(\u0027accessToken\u0027, j.jetonAcces);",
+                                                  "      pm.environment.set(\u0027accessExpireAt\u0027, String(Date.now() + j.expireDansSecondes * 1000));",
+                                                  "    }",
+                                                  "  } catch (e) { /* la réponse n\u0027est pas du JSON : on ignore */ }",
+                                                  "}"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "test"
+                  }
+              ],
+    "item":  [
+                 {
+                     "name":  "A. Super Admin",
+                     "item":  [
+                                  {
+                                      "name":  "01 - Connexion superadmin",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Role SUPER_ADMIN\u0027, function () { pm.expect(j.profil.role).to.eql(\u0027SUPER_ADMIN\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"Essap@Dev2026\",\r\n    \"identifiant\":  \"superadmin\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02 - Liste des instituts (recherche DEMO)",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Les deux instituts demo sont listes\u0027, function () { var codes = j.donnees.map(function (i) { return i.code; }); pm.expect(codes).to.include.members([\u0027DEMO-LOCAL\u0027, \u0027DEMO-B\u0027]); });",
+                                                                                    "if (j) { j.donnees.forEach(function (i) { if (i.code === \u0027DEMO-LOCAL\u0027) { pm.environment.set(\u0027institutDemoId\u0027, String(i.id)); } if (i.code === \u0027DEMO-B\u0027) { pm.environment.set(\u0027institutBId\u0027, String(i.id)); } }); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts?q=DEMO\u0026limite=50",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "q",
+                                                                                    "value":  "DEMO"
+                                                                                },
+                                                                                {
+                                                                                    "key":  "limite",
+                                                                                    "value":  "50"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03 - Institut courant SANS en-tete = 400",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04 - Institut courant avec X-Institut-Id = DEMO-B",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Institut DEMO-B\u0027, function () { pm.expect(j.code).to.eql(\u0027DEMO-B\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Institut-Id",
+                                                                         "value":  "{{institutBId}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05 - Institut inexistant = 404",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 404\u0027, function () { pm.response.to.have.status(404); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Institut-Id",
+                                                                         "value":  "999999"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "B. Creation et gestion",
+                     "item":  [
+                                  {
+                                      "name":  "06 - Creer un institut avec 3 autorites",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var s = String(Date.now()).slice(-8);",
+                                                                                    "pm.environment.set(\u0027suffixe\u0027, s);",
+                                                                                    "pm.environment.set(\u0027codeNouveau\u0027, \u0027PM\u0027 + s);",
+                                                                                    "pm.environment.set(\u0027prefixeNouveau\u0027, s.split(\u0027\u0027).map(function (c) { return String.fromCharCode(65 + Number(c)); }).join(\u0027\u0027));",
+                                                                                    "pm.environment.set(\u0027tel1\u0027, \u0027+2439\u0027 + s);",
+                                                                                    "pm.environment.set(\u0027tel2\u0027, \u0027+2438\u0027 + s);",
+                                                                                    "pm.environment.set(\u0027tel3\u0027, \u0027+2437\u0027 + s);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "prerequest"
+                                                    },
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Reponse jamais mise en cache\u0027, function () { pm.expect(pm.response.headers.get(\u0027Cache-Control\u0027)).to.include(\u0027no-store\u0027); });",
+                                                                                    "pm.test(\u0027Trois autorites avec mot de passe temporaire\u0027, function () { pm.expect(j.autorites.length).to.eql(3); j.autorites.forEach(function (a) { pm.expect(a.motDePasseTemporaire).to.be.a(\u0027string\u0027); }); });",
+                                                                                    "if (j) { pm.environment.set(\u0027nouvelInstitutId\u0027, String(j.institut.id)); }",
+                                                                                    "if (j) { var s = j.autorites.filter(function (a) { return a.role === \u0027SGAC\u0027; })[0]; pm.environment.set(\u0027sgacUser\u0027, s.nomUtilisateur); pm.environment.set(\u0027sgacMdp\u0027, s.motDePasseTemporaire); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"sigle\":  \"PMT\",\r\n    \"code\":  \"{{codeNouveau}}\",\r\n    \"prefixeMatricule\":  \"{{prefixeNouveau}}\",\r\n    \"adresse\":  \"Adresse de test\",\r\n    \"autorites\":  [\r\n                      {\r\n                          \"telephone\":  \"{{tel1}}\",\r\n                          \"nom\":  \"Dupont\",\r\n                          \"prenom\":  \"Test\",\r\n                          \"email\":  \"dg.pm{{suffixe}}@essap.test\",\r\n                          \"role\":  \"DG\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel2}}\",\r\n                          \"nom\":  \"Sgac\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"SGAC\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel3}}\",\r\n                          \"nom\":  \"Budget\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"ADMIN_BUDGET\"\r\n                      }\r\n                  ],\r\n    \"nom\":  \"Institut Test Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "07 - Meme code = 409 (doublon)",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 409\u0027, function () { pm.response.to.have.status(409); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"sigle\":  \"PMT\",\r\n    \"code\":  \"{{codeNouveau}}\",\r\n    \"prefixeMatricule\":  \"{{prefixeNouveau}}\",\r\n    \"adresse\":  \"Adresse de test\",\r\n    \"autorites\":  [\r\n                      {\r\n                          \"telephone\":  \"{{tel1}}\",\r\n                          \"nom\":  \"Dupont\",\r\n                          \"prenom\":  \"Test\",\r\n                          \"email\":  \"dg.pm{{suffixe}}@essap.test\",\r\n                          \"role\":  \"DG\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel2}}\",\r\n                          \"nom\":  \"Sgac\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"SGAC\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel3}}\",\r\n                          \"nom\":  \"Budget\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"ADMIN_BUDGET\"\r\n                      }\r\n                  ],\r\n    \"nom\":  \"Institut Test Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "08 - Champ interdit (estPrincipal) = 400",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"sigle\":  \"PMT\",\r\n    \"code\":  \"{{codeNouveau}}\",\r\n    \"prefixeMatricule\":  \"{{prefixeNouveau}}\",\r\n    \"adresse\":  \"Adresse de test\",\r\n    \"estPrincipal\":  true,\r\n    \"autorites\":  [\r\n                      {\r\n                          \"telephone\":  \"{{tel1}}\",\r\n                          \"nom\":  \"Dupont\",\r\n                          \"prenom\":  \"Test\",\r\n                          \"email\":  \"dg.pm{{suffixe}}@essap.test\",\r\n                          \"role\":  \"DG\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel2}}\",\r\n                          \"nom\":  \"Sgac\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"SGAC\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel3}}\",\r\n                          \"nom\":  \"Budget\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"ADMIN_BUDGET\"\r\n                      }\r\n                  ],\r\n    \"nom\":  \"Institut Test Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "09 - Creer un SUPER_ADMIN par lAPI = 400",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"code\":  \"PIRATE1\",\r\n    \"nom\":  \"Test\",\r\n    \"prefixeMatricule\":  \"ZZ\",\r\n    \"autorites\":  [\r\n                      {\r\n                          \"role\":  \"SUPER_ADMIN\",\r\n                          \"nom\":  \"Pirate\"\r\n                      }\r\n                  ]\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "10 - Detail : 3 autorites, aucun secret",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Trois autorites\u0027, function () { pm.expect(j.autorites.length).to.eql(3); });",
+                                                                                    "pm.test(\u0027Aucun mot de passe hache dans la reponse\u0027, function () { pm.expect(pm.response.text()).to.not.include(\u0027motDePasseHache\u0027); pm.expect(pm.response.text()).to.not.include(\u0027argon2id\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "11 - Modifier ladresse",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Adresse modifiee\u0027, function () { pm.expect(j.adresse).to.eql(\u0027Nouvelle adresse Postman\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"adresse\":  \"Nouvelle adresse Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "12 - Desactiver linstitut",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Institut inactif\u0027, function () { pm.expect(j.actif).to.eql(false); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}/desactiver",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}",
+                                                                               "desactiver"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motif\":  \"Test Postman impaye\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "C. Institut desactive",
+                     "item":  [
+                                  {
+                                      "name":  "13 - Le SGAC ne peut plus se connecter = 401",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 401\u0027, function () { pm.response.to.have.status(401); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"{{sgacMdp}}\",\r\n    \"identifiant\":  \"{{sgacUser}}\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "14 - Reactiver linstitut",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Institut actif\u0027, function () { pm.expect(j.actif).to.eql(true); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}/activer",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}",
+                                                                               "activer"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "15 - Le SGAC se connecte (mot de passe temporaire)",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Role SGAC\u0027, function () { pm.expect(j.profil.role).to.eql(\u0027SGAC\u0027); });",
+                                                                                    "pm.test(\u0027Doit changer son mot de passe\u0027, function () { pm.expect(j.doitChangerMotDePasse).to.eql(true); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"{{sgacMdp}}\",\r\n    \"identifiant\":  \"{{sgacUser}}\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "D. Isolation (SGAC)",
+                     "item":  [
+                                  {
+                                      "name":  "16 - Son institut est impose par le jeton",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Institut = le nouvel institut\u0027, function () { pm.expect(j.id).to.eql(Number(pm.environment.get(\u0027nouvelInstitutId\u0027))); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "17 - Demander un AUTRE institut par en-tete = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Institut-Id",
+                                                                         "value":  "{{institutDemoId}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "18 - Lire le detail dun autre institut = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "19 - Liste des instituts interdite au SGAC = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "20 - Creer un institut interdit au SGAC = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"sigle\":  \"PMT\",\r\n    \"code\":  \"{{codeNouveau}}\",\r\n    \"prefixeMatricule\":  \"{{prefixeNouveau}}\",\r\n    \"adresse\":  \"Adresse de test\",\r\n    \"autorites\":  [\r\n                      {\r\n                          \"telephone\":  \"{{tel1}}\",\r\n                          \"nom\":  \"Dupont\",\r\n                          \"prenom\":  \"Test\",\r\n                          \"email\":  \"dg.pm{{suffixe}}@essap.test\",\r\n                          \"role\":  \"DG\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel2}}\",\r\n                          \"nom\":  \"Sgac\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"SGAC\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel3}}\",\r\n                          \"nom\":  \"Budget\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"ADMIN_BUDGET\"\r\n                      }\r\n                  ],\r\n    \"nom\":  \"Institut Test Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "21 - Detail de SON institut = 200",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "E. DG (plusieurs instituts)",
+                     "item":  [
+                                  {
+                                      "name":  "22 - Connexion dg.demo",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Role DG\u0027, function () { pm.expect(j.profil.role).to.eql(\u0027DG\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"Essap@Dev2026\",\r\n    \"identifiant\":  \"dg.demo\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "23 - Il ne voit QUE ses instituts",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Voit DEMO-LOCAL et DEMO-B\u0027, function () { var codes = j.donnees.map(function (i) { return i.code; }); pm.expect(codes).to.include.members([\u0027DEMO-LOCAL\u0027, \u0027DEMO-B\u0027]); });",
+                                                                                    "pm.test(\u0027Ne voit PAS le nouvel institut\u0027, function () { var ids = j.donnees.map(function (i) { return String(i.id); }); pm.expect(ids).to.not.include(pm.environment.get(\u0027nouvelInstitutId\u0027)); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts?limite=100",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "limite",
+                                                                                    "value":  "100"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "24 - Deux instituts : en-tete obligatoire = 400",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "25 - Choisir DEMO-B (autorise) = 200",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Institut DEMO-B\u0027, function () { pm.expect(j.code).to.eql(\u0027DEMO-B\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Institut-Id",
+                                                                         "value":  "{{institutBId}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "26 - Choisir le nouvel institut (non autorise) = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Institut-Id",
+                                                                         "value":  "{{nouvelInstitutId}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "27 - Creer un institut interdit au DG = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"sigle\":  \"PMT\",\r\n    \"code\":  \"{{codeNouveau}}\",\r\n    \"prefixeMatricule\":  \"{{prefixeNouveau}}\",\r\n    \"adresse\":  \"Adresse de test\",\r\n    \"autorites\":  [\r\n                      {\r\n                          \"telephone\":  \"{{tel1}}\",\r\n                          \"nom\":  \"Dupont\",\r\n                          \"prenom\":  \"Test\",\r\n                          \"email\":  \"dg.pm{{suffixe}}@essap.test\",\r\n                          \"role\":  \"DG\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel2}}\",\r\n                          \"nom\":  \"Sgac\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"SGAC\"\r\n                      },\r\n                      {\r\n                          \"telephone\":  \"{{tel3}}\",\r\n                          \"nom\":  \"Budget\",\r\n                          \"prenom\":  \"Postman\",\r\n                          \"role\":  \"ADMIN_BUDGET\"\r\n                      }\r\n                  ],\r\n    \"nom\":  \"Institut Test Postman\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "28 - Modifier un institut non autorise = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{nouvelInstitutId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{nouvelInstitutId}}"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"adresse\":  \"Tentative de piratage\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "F. Etudiant et sans jeton",
+                     "item":  [
+                                  {
+                                      "name":  "29 - Connexion etudiant",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Role ETUDIANT\u0027, function () { pm.expect(j.profil.role).to.eql(\u0027ETUDIANT\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion-etudiant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion-etudiant"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"matricule\":  \"DEMO2026L10001\",\r\n    \"dateNaissance\":  \"2004-03-15\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "30 - Liste des instituts interdite a letudiant = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "31 - Institut courant interdit a letudiant = 403",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/courant",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "courant"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "32 - SANS jeton = 401",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 401\u0027, function () { pm.response.to.have.status(401); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ]
+                                                              },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "33 - Retour au Super Admin",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"Essap@Dev2026\",\r\n    \"identifiant\":  \"superadmin\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}

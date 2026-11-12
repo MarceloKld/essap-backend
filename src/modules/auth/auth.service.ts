@@ -20,6 +20,7 @@ const TOLERANCE_REUTILISATION_MS = 10_000;
 const INCLUSION_PERSONNEL = {
   role: true,
   accesInstituts: { select: { institutId: true } },
+  institut: { select: { actif: true } },
 } satisfies Prisma.UtilisateurInclude;
 type UtilisateurComplet = Prisma.UtilisateurGetPayload<{ include: typeof INCLUSION_PERSONNEL }>;
 
@@ -56,7 +57,7 @@ export class AuthService {
 
     const maintenant = new Date();
     const verrouille = utilisateur.verrouilleJusqua !== null && utilisateur.verrouilleJusqua > maintenant;
-    if (!utilisateur.actif || verrouille) {
+    if (!utilisateur.actif || verrouille || utilisateur.institut?.actif === false) {
       await this.simulerVerification(motDePasse);
       await this.audit.enregistrer({
         action: 'CONNEXION_REFUSEE',
@@ -102,12 +103,12 @@ export class AuthService {
   async connecterEtudiant(matricule: string, dateNaissance: string, ctx: ContexteRequete): Promise<ResultatSession> {
     const etudiant = await this.prisma.etudiant.findFirst({
       where: { matricule, supprimeLe: null },
-      include: { compte: true },
+      include: { compte: true, institut: { select: { actif: true } } },
     });
     const compte = etudiant?.compte;
     const maintenant = new Date();
 
-    if (!etudiant || !compte || !compte.actif || (compte.verrouilleJusqua && compte.verrouilleJusqua > maintenant)) {
+    if (!etudiant || !compte || !compte.actif || etudiant.institut.actif === false || (compte.verrouilleJusqua && compte.verrouilleJusqua > maintenant)) {
       await this.audit.enregistrer({
         action: 'CONNEXION_ETUDIANT_REFUSEE',
         institutId: etudiant?.institutId ?? null,
@@ -175,7 +176,7 @@ export class AuthService {
       where: { empreinte: empreinteJeton(jetonBrut) },
       include: {
         utilisateur: { include: INCLUSION_PERSONNEL },
-        compteEtudiant: { include: { etudiant: true } },
+        compteEtudiant: { include: { etudiant: { include: { institut: { select: { actif: true } } } } } },
       },
     });
     if (!jeton) throw new UnauthorizedException('Session invalide.');
@@ -208,7 +209,7 @@ export class AuthService {
     // On recharge la personne : si son compte a été désactivé ou son rôle changé, on le voit ici.
     if (jeton.utilisateur) {
       const u = jeton.utilisateur;
-      if (!u.actif || u.supprimeLe) {
+      if (!u.actif || u.supprimeLe || u.institut?.actif === false) {
         await this.jetons.revoquerFamille(jeton.familleId, 'COMPTE_DESACTIVE');
         throw new UnauthorizedException('Session invalide.');
       }
@@ -223,7 +224,7 @@ export class AuthService {
     }
 
     const compte = jeton.compteEtudiant;
-    if (compte && compte.actif && !compte.etudiant.supprimeLe) {
+    if (compte && compte.actif && !compte.etudiant.supprimeLe && compte.etudiant.institut.actif) {
       return this.ouvrirSession(
         this.payloadEtudiant(compte.etudiant),
         { compteEtudiantId: compte.id },
