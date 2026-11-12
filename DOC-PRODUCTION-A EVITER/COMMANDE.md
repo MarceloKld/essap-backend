@@ -1,0 +1,1 @@
+# 1. Remarque : en production on utilise migrate deploy et jamais migrate dev. migrate deploy applique seulement les migrations déjà écrites, sans jamais vider ni deviner quoi que ce soit.
