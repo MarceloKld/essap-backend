@@ -3,9 +3,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
 /**
- * SEED = données de départ, indispensables au fonctionnement du logiciel.
- * Il est IDEMPOTENT : on peut le lancer 10 fois, il ne crée pas de doublons,
- * car on utilise "upsert" (= mettre à jour si ça existe, sinon créer).
+ * SEED = données de référence communes à TOUS les instituts.
+ * Les instituts eux-mêmes ne sont PAS ici : c'est le Super Admin qui les crée
+ * depuis l'application, avec leurs autorités (DG, SGAC, Administrateur du Budget).
+ *
+ * IDEMPOTENT : on peut le relancer sans créer de doublons (upsert).
  */
 const urlBase = process.env.DATABASE_URL;
 if (!urlBase) throw new Error('DATABASE_URL manquante dans le .env');
@@ -13,7 +15,7 @@ if (!urlBase) throw new Error('DATABASE_URL manquante dans le .env');
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: urlBase }) });
 
 async function main() {
-  // --- 1. Rôles (validés par Marcelo) ---
+  // --- 1. Rôles ---
   const roles = [
     { code: 'SUPER_ADMIN', libelle: 'Super Admin' },
     { code: 'DG', libelle: 'Directeur Général' },
@@ -25,21 +27,7 @@ async function main() {
     await prisma.role.upsert({ where: { code: r.code }, update: { libelle: r.libelle }, create: r });
   }
 
-  // --- 2. Extension principale (le siège) ---
-  await prisma.extension.upsert({
-    where: { code: 'ESSAP-SIEGE' },
-    update: {},
-    create: {
-      code: 'ESSAP-SIEGE',
-      nom: 'ESSAP – Siège',
-      adresse: 'N° 07, entre Kasa-Vubu et Éthiopie (réf. : collège des Érudits)',
-      telephone: '+243 898 997 266',
-      email: 'kalonji905@gmail.com',
-      estPrincipale: true,
-    },
-  });
-
-  // --- 3. Classes : L1, L2, L3 (M1 et M2 s'ajouteront plus tard par une ligne) ---
+  // --- 2. Classes : M1 et M2 s'ajouteront plus tard par une simple ligne ---
   const classes = [
     { code: 'L1', libelle: 'Licence 1', ordre: 1 },
     { code: 'L2', libelle: 'Licence 2', ordre: 2 },
@@ -49,7 +37,7 @@ async function main() {
     await prisma.classe.upsert({ where: { code: c.code }, update: { libelle: c.libelle }, create: c });
   }
 
-  // --- 4. Catégories de frais ---
+  // --- 3. Catégories de frais ---
   const categories = [
     { code: 'INSCRIPTION', libelle: "Frais d'inscription", nature: 'ACADEMIQUE' },
     { code: 'REINSCRIPTION', libelle: 'Frais de réinscription', nature: 'ACADEMIQUE' },
@@ -68,30 +56,7 @@ async function main() {
     });
   }
 
-  // --- 5. Année scolaire en cours (dates PROVISOIRES : à corriger avec les vraies dates) ---
-  await prisma.anneeScolaire.upsert({
-    where: { libelle: '2026-2027' },
-    update: {},
-    create: {
-      libelle: '2026-2027',
-      dateDebut: new Date('2026-10-01'),
-      dateFin: new Date('2027-07-31'),
-      estActive: true,
-    },
-  });
-
-  // --- 6. Paramètres : format du matricule (ex. ESSAP2026L10001) ---
-  await prisma.parametre.upsert({
-    where: { cle: 'matricule.format' },
-    update: {},
-    create: {
-      cle: 'matricule.format',
-      valeur: { prefixe: 'ESSAP', longueurSequence: 5 },
-      description: 'Préfixe + année + classe + numéro de séquence',
-    },
-  });
-
-  console.log('Seed terminé.');
+  console.log('Seed terminé : rôles, classes et catégories de frais.');
 }
 
 main()

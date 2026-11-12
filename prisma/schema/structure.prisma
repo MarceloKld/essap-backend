@@ -1,61 +1,90 @@
 // ============================================================
-//  STRUCTURE DE L'INSTITUTION
+//  STRUCTURE : INSTITUTS, ANNÃ‰ES, CLASSES, PARAMÃˆTRES
 // ============================================================
 
-// Une extension = un site de l'ESSAP. Il y en a au moins une (le siège).
-// Seul le DG peut en ajouter. Presque toutes les données portent un extension_id :
-// c'est ce qui permet de cloisonner les sites entre eux.
-model Extension {
-  id            Int       @id @default(autoincrement())
-  code          String    @unique @db.VarChar(20)
-  nom           String    @db.VarChar(150)
-  adresse       String?   @db.VarChar(255)
-  telephone     String?   @db.VarChar(30)
-  email         String?   @db.VarChar(150)
-  estPrincipale Boolean   @default(false) @map("est_principale")
-  actif         Boolean   @default(true)
-  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
-  modifieLe     DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
-  supprimeLe    DateTime? @map("supprime_le") @db.Timestamptz(3)
+// Un institut = un Ã©tablissement ou un site (le siÃ¨ge, une extension).
+// C'est le Â« locataire Â» (tenant) du logiciel : presque toutes les donnÃ©es portent un
+// institut_id, ce qui isole les instituts les uns des autres.
+model Institut {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique @db.VarChar(20)
+  nom          String    @db.VarChar(150)
+  sigle        String?   @db.VarChar(20)
+  adresse      String?   @db.VarChar(255)
+  telephone    String?   @db.VarChar(30)
+  email        String?   @db.VarChar(150)
+  // Logo hÃ©bergÃ© sur Cloudinary. On garde l'URL (pour l'afficher) ET l'identifiant
+  // public (pour pouvoir remplacer ou supprimer l'image plus tard).
+  logoUrl      String?   @map("logo_url") @db.VarChar(500)
+  logoIdPublic String?   @map("logo_id_public") @db.VarChar(200)
+  estPrincipal Boolean   @default(false) @map("est_principal") // le siÃ¨ge
+  actif        Boolean   @default(true)
+  creeLe       DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe    DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
+  supprimeLe   DateTime? @map("supprime_le") @db.Timestamptz(3)
 
-  // Relations inverses : « une extension possède plusieurs... »
   utilisateurs       Utilisateur[]
+  accesInstituts     AccesInstitut[]
+  anneesScolaires    AnneeScolaire[]
+  parametres         Parametre[]
   etudiants          Etudiant[]
   inscriptions       Inscription[]
   frais              Frais[]
+  tauxChange         TauxChange[]
   paiements          Paiement[]
   sequencesMatricule SequenceMatricule[]
 
-  @@map("extensions")
+  @@map("instituts")
 }
 
-// L'année scolaire est la clé de traçabilité de tout le logiciel (§16).
+// Liste des instituts auxquels un utilisateur a accÃ¨s (utile surtout au DG,
+// qui gÃ¨re plusieurs instituts). ClÃ© composÃ©e : un couple utilisateur/institut n'existe qu'une fois.
+model AccesInstitut {
+  utilisateurId String   @map("utilisateur_id") @db.Uuid
+  institutId    Int      @map("institut_id")
+  creeLe        DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  institut    Institut    @relation(fields: [institutId], references: [id], onDelete: Cascade)
+
+  @@id([utilisateurId, institutId])
+  @@index([institutId])
+  @@map("acces_instituts")
+}
+
+// L'annÃ©e scolaire est la clÃ© de traÃ§abilitÃ© de tout le logiciel (Â§16).
+// Elle est PROPRE Ã€ CHAQUE INSTITUT : clÃ´turer 2026-2027 dans l'institut TEST
+// ne touche jamais l'annÃ©e du vrai institut.
 model AnneeScolaire {
   id          Int       @id @default(autoincrement())
-  libelle     String    @unique @db.VarChar(9) // "2026-2027"
+  institutId  Int       @map("institut_id")
+  libelle     String    @db.VarChar(9) // "2026-2027"
   dateDebut   DateTime  @map("date_debut") @db.Date
   dateFin     DateTime  @map("date_fin") @db.Date
   estActive   Boolean   @default(false) @map("est_active")
-  estCloturee Boolean   @default(false) @map("est_cloturee") // clôturée = lecture seule
+  estCloturee Boolean   @default(false) @map("est_cloturee") // clÃ´turÃ©e = lecture seule
   clotureLe   DateTime? @map("cloture_le") @db.Timestamptz(3)
   creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
   modifieLe   DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
 
+  institut           Institut            @relation(fields: [institutId], references: [id])
   inscriptions       Inscription[]
   statutsAnnuels     StatutAnnuel[]
   frais              Frais[]
   paiements          Paiement[]
   sequencesMatricule SequenceMatricule[]
 
+  @@unique([institutId, libelle])
   @@map("annees_scolaires")
 }
 
-// Extensible : M1 et M2 s'ajouteront par une simple ligne, sans toucher au code.
+// Table de rÃ©fÃ©rence COMMUNE Ã  tous les instituts. Extensible : M1 et M2
+// s'ajouteront par une simple ligne, sans toucher au code.
 model Classe {
   id      Int     @id @default(autoincrement())
   code    String  @unique @db.VarChar(10) // L1, L2, L3, plus tard M1, M2
   libelle String  @db.VarChar(60)
-  ordre   Int     // 1, 2, 3... sert à savoir quelle est la classe suivante
+  ordre   Int     // 1, 2, 3... sert Ã  savoir quelle est la classe suivante
   actif   Boolean @default(true)
 
   inscriptions       Inscription[]
@@ -65,14 +94,18 @@ model Classe {
   @@map("classes")
 }
 
-// Réglages du logiciel sous forme clé / valeur (format du matricule, seuils, etc.)
+// RÃ©glages sous forme clÃ© / valeur, PAR INSTITUT (format du matricule, seuils, etc.)
 model Parametre {
   id          Int      @id @default(autoincrement())
-  cle         String   @unique @db.VarChar(80)
+  institutId  Int      @map("institut_id")
+  cle         String   @db.VarChar(80)
   valeur      Json
   description String?  @db.VarChar(255)
   modifiePar  String?  @map("modifie_par") @db.Uuid
   modifieLe   DateTime @updatedAt @map("modifie_le") @db.Timestamptz(3)
 
+  institut Institut @relation(fields: [institutId], references: [id])
+
+  @@unique([institutId, cle])
   @@map("parametres")
 }

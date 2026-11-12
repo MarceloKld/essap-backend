@@ -38,7 +38,7 @@ CREATE TABLE "roles" (
 -- CreateTable
 CREATE TABLE "utilisateurs" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "extension_id" INTEGER,
+    "institut_id" INTEGER,
     "role_id" INTEGER NOT NULL,
     "nom_utilisateur" VARCHAR(50) NOT NULL,
     "email" VARCHAR(150),
@@ -96,7 +96,7 @@ CREATE TABLE "jetons_rafraichissement" (
 CREATE TABLE "journal_audit" (
     "id" BIGSERIAL NOT NULL,
     "utilisateur_id" UUID,
-    "extension_id" INTEGER,
+    "institut_id" INTEGER,
     "action" VARCHAR(60) NOT NULL,
     "entite" VARCHAR(60),
     "entite_id" VARCHAR(60),
@@ -113,7 +113,7 @@ CREATE TABLE "journal_audit" (
 -- CreateTable
 CREATE TABLE "etudiants" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "extension_id" INTEGER NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "matricule" VARCHAR(30),
     "nom" VARCHAR(80) NOT NULL,
     "postnom" VARCHAR(80),
@@ -144,7 +144,7 @@ CREATE TABLE "inscriptions" (
     "etudiant_id" UUID NOT NULL,
     "annee_id" INTEGER NOT NULL,
     "classe_id" INTEGER NOT NULL,
-    "extension_id" INTEGER NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "type" "type_inscription" NOT NULL,
     "date_inscription" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "annulee_le" TIMESTAMPTZ(3),
@@ -170,7 +170,7 @@ CREATE TABLE "statuts_annuels" (
 -- CreateTable
 CREATE TABLE "sequences_matricule" (
     "id" SERIAL NOT NULL,
-    "extension_id" INTEGER NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "annee_id" INTEGER NOT NULL,
     "classe_id" INTEGER NOT NULL,
     "dernier_numero" INTEGER NOT NULL DEFAULT 0,
@@ -192,7 +192,7 @@ CREATE TABLE "categories_frais" (
 -- CreateTable
 CREATE TABLE "frais" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "extension_id" INTEGER NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "annee_id" INTEGER NOT NULL,
     "classe_id" INTEGER NOT NULL,
     "categorie_id" INTEGER NOT NULL,
@@ -223,6 +223,7 @@ CREATE TABLE "tranches" (
 -- CreateTable
 CREATE TABLE "taux_change" (
     "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "devise_source" "devise" NOT NULL,
     "devise_cible" "devise" NOT NULL,
     "taux" DECIMAL(18,6) NOT NULL,
@@ -236,7 +237,7 @@ CREATE TABLE "taux_change" (
 -- CreateTable
 CREATE TABLE "paiements" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "extension_id" INTEGER NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "annee_id" INTEGER NOT NULL,
     "etudiant_id" UUID NOT NULL,
     "inscription_id" UUID NOT NULL,
@@ -277,25 +278,38 @@ CREATE TABLE "recus" (
 );
 
 -- CreateTable
-CREATE TABLE "extensions" (
+CREATE TABLE "instituts" (
     "id" SERIAL NOT NULL,
     "code" VARCHAR(20) NOT NULL,
     "nom" VARCHAR(150) NOT NULL,
+    "sigle" VARCHAR(20),
     "adresse" VARCHAR(255),
     "telephone" VARCHAR(30),
     "email" VARCHAR(150),
-    "est_principale" BOOLEAN NOT NULL DEFAULT false,
+    "logo_url" VARCHAR(500),
+    "logo_id_public" VARCHAR(200),
+    "est_principal" BOOLEAN NOT NULL DEFAULT false,
     "actif" BOOLEAN NOT NULL DEFAULT true,
     "cree_le" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "modifie_le" TIMESTAMPTZ(3) NOT NULL,
     "supprime_le" TIMESTAMPTZ(3),
 
-    CONSTRAINT "extensions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "instituts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "acces_instituts" (
+    "utilisateur_id" UUID NOT NULL,
+    "institut_id" INTEGER NOT NULL,
+    "cree_le" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "acces_instituts_pkey" PRIMARY KEY ("utilisateur_id","institut_id")
 );
 
 -- CreateTable
 CREATE TABLE "annees_scolaires" (
     "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "libelle" VARCHAR(9) NOT NULL,
     "date_debut" DATE NOT NULL,
     "date_fin" DATE NOT NULL,
@@ -322,6 +336,7 @@ CREATE TABLE "classes" (
 -- CreateTable
 CREATE TABLE "parametres" (
     "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
     "cle" VARCHAR(80) NOT NULL,
     "valeur" JSONB NOT NULL,
     "description" VARCHAR(255),
@@ -344,7 +359,7 @@ CREATE UNIQUE INDEX "utilisateurs_email_key" ON "utilisateurs"("email");
 CREATE UNIQUE INDEX "utilisateurs_telephone_key" ON "utilisateurs"("telephone");
 
 -- CreateIndex
-CREATE INDEX "utilisateurs_extension_id_role_id_idx" ON "utilisateurs"("extension_id", "role_id");
+CREATE INDEX "utilisateurs_institut_id_role_id_idx" ON "utilisateurs"("institut_id", "role_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "comptes_etudiants_etudiant_id_key" ON "comptes_etudiants"("etudiant_id");
@@ -380,13 +395,13 @@ CREATE INDEX "journal_audit_cree_le_idx" ON "journal_audit"("cree_le");
 CREATE UNIQUE INDEX "etudiants_matricule_key" ON "etudiants"("matricule");
 
 -- CreateIndex
-CREATE INDEX "etudiants_extension_id_matricule_idx" ON "etudiants"("extension_id", "matricule");
+CREATE INDEX "etudiants_institut_id_matricule_idx" ON "etudiants"("institut_id", "matricule");
 
 -- CreateIndex
 CREATE INDEX "etudiants_nom_prenom_idx" ON "etudiants"("nom", "prenom");
 
 -- CreateIndex
-CREATE INDEX "inscriptions_extension_id_annee_id_classe_id_idx" ON "inscriptions"("extension_id", "annee_id", "classe_id");
+CREATE INDEX "inscriptions_institut_id_annee_id_classe_id_idx" ON "inscriptions"("institut_id", "annee_id", "classe_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "inscriptions_etudiant_id_annee_id_key" ON "inscriptions"("etudiant_id", "annee_id");
@@ -395,25 +410,25 @@ CREATE UNIQUE INDEX "inscriptions_etudiant_id_annee_id_key" ON "inscriptions"("e
 CREATE UNIQUE INDEX "statuts_annuels_etudiant_id_annee_id_key" ON "statuts_annuels"("etudiant_id", "annee_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "sequences_matricule_extension_id_annee_id_classe_id_key" ON "sequences_matricule"("extension_id", "annee_id", "classe_id");
+CREATE UNIQUE INDEX "sequences_matricule_institut_id_annee_id_classe_id_key" ON "sequences_matricule"("institut_id", "annee_id", "classe_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_frais_code_key" ON "categories_frais"("code");
 
 -- CreateIndex
-CREATE INDEX "frais_extension_id_annee_id_classe_id_idx" ON "frais"("extension_id", "annee_id", "classe_id");
+CREATE INDEX "frais_institut_id_annee_id_classe_id_idx" ON "frais"("institut_id", "annee_id", "classe_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uq_frais_par_classe" ON "frais"("extension_id", "annee_id", "classe_id", "categorie_id", "libelle");
+CREATE UNIQUE INDEX "uq_frais_par_classe" ON "frais"("institut_id", "annee_id", "classe_id", "categorie_id", "libelle");
 
 -- CreateIndex
 CREATE INDEX "tranches_frais_id_idx" ON "tranches"("frais_id");
 
 -- CreateIndex
-CREATE INDEX "taux_change_devise_source_devise_cible_valide_depuis_idx" ON "taux_change"("devise_source", "devise_cible", "valide_depuis");
+CREATE INDEX "taux_change_institut_id_devise_source_devise_cible_valide_d_idx" ON "taux_change"("institut_id", "devise_source", "devise_cible", "valide_depuis");
 
 -- CreateIndex
-CREATE INDEX "paiements_extension_id_annee_id_etudiant_id_idx" ON "paiements"("extension_id", "annee_id", "etudiant_id");
+CREATE INDEX "paiements_institut_id_annee_id_etudiant_id_idx" ON "paiements"("institut_id", "annee_id", "etudiant_id");
 
 -- CreateIndex
 CREATE INDEX "paiements_etudiant_id_frais_id_idx" ON "paiements"("etudiant_id", "frais_id");
@@ -431,19 +446,22 @@ CREATE UNIQUE INDEX "recus_remplace_par_id_key" ON "recus"("remplace_par_id");
 CREATE INDEX "recus_paiement_id_idx" ON "recus"("paiement_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "extensions_code_key" ON "extensions"("code");
+CREATE UNIQUE INDEX "instituts_code_key" ON "instituts"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "annees_scolaires_libelle_key" ON "annees_scolaires"("libelle");
+CREATE INDEX "acces_instituts_institut_id_idx" ON "acces_instituts"("institut_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "annees_scolaires_institut_id_libelle_key" ON "annees_scolaires"("institut_id", "libelle");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "classes_code_key" ON "classes"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "parametres_cle_key" ON "parametres"("cle");
+CREATE UNIQUE INDEX "parametres_institut_id_cle_key" ON "parametres"("institut_id", "cle");
 
 -- AddForeignKey
-ALTER TABLE "utilisateurs" ADD CONSTRAINT "utilisateurs_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "utilisateurs" ADD CONSTRAINT "utilisateurs_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "utilisateurs" ADD CONSTRAINT "utilisateurs_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -461,7 +479,7 @@ ALTER TABLE "jetons_rafraichissement" ADD CONSTRAINT "jetons_rafraichissement_co
 ALTER TABLE "journal_audit" ADD CONSTRAINT "journal_audit_utilisateur_id_fkey" FOREIGN KEY ("utilisateur_id") REFERENCES "utilisateurs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "etudiants" ADD CONSTRAINT "etudiants_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "etudiants" ADD CONSTRAINT "etudiants_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "inscriptions" ADD CONSTRAINT "inscriptions_etudiant_id_fkey" FOREIGN KEY ("etudiant_id") REFERENCES "etudiants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -473,7 +491,7 @@ ALTER TABLE "inscriptions" ADD CONSTRAINT "inscriptions_annee_id_fkey" FOREIGN K
 ALTER TABLE "inscriptions" ADD CONSTRAINT "inscriptions_classe_id_fkey" FOREIGN KEY ("classe_id") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "inscriptions" ADD CONSTRAINT "inscriptions_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "inscriptions" ADD CONSTRAINT "inscriptions_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "statuts_annuels" ADD CONSTRAINT "statuts_annuels_etudiant_id_fkey" FOREIGN KEY ("etudiant_id") REFERENCES "etudiants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -482,7 +500,7 @@ ALTER TABLE "statuts_annuels" ADD CONSTRAINT "statuts_annuels_etudiant_id_fkey" 
 ALTER TABLE "statuts_annuels" ADD CONSTRAINT "statuts_annuels_annee_id_fkey" FOREIGN KEY ("annee_id") REFERENCES "annees_scolaires"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_annee_id_fkey" FOREIGN KEY ("annee_id") REFERENCES "annees_scolaires"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -491,7 +509,7 @@ ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_annee_id_f
 ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_classe_id_fkey" FOREIGN KEY ("classe_id") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "frais" ADD CONSTRAINT "frais_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "frais" ADD CONSTRAINT "frais_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "frais" ADD CONSTRAINT "frais_annee_id_fkey" FOREIGN KEY ("annee_id") REFERENCES "annees_scolaires"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -509,7 +527,10 @@ ALTER TABLE "tranches" ADD CONSTRAINT "tranches_frais_id_fkey" FOREIGN KEY ("fra
 ALTER TABLE "tranches" ADD CONSTRAINT "tranches_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "tranches"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "paiements" ADD CONSTRAINT "paiements_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "extensions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "taux_change" ADD CONSTRAINT "taux_change_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "paiements" ADD CONSTRAINT "paiements_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "paiements" ADD CONSTRAINT "paiements_annee_id_fkey" FOREIGN KEY ("annee_id") REFERENCES "annees_scolaires"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -534,3 +555,15 @@ ALTER TABLE "recus" ADD CONSTRAINT "recus_paiement_id_fkey" FOREIGN KEY ("paieme
 
 -- AddForeignKey
 ALTER TABLE "recus" ADD CONSTRAINT "recus_remplace_par_id_fkey" FOREIGN KEY ("remplace_par_id") REFERENCES "recus"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "acces_instituts" ADD CONSTRAINT "acces_instituts_utilisateur_id_fkey" FOREIGN KEY ("utilisateur_id") REFERENCES "utilisateurs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "acces_instituts" ADD CONSTRAINT "acces_instituts_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "annees_scolaires" ADD CONSTRAINT "annees_scolaires_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "parametres" ADD CONSTRAINT "parametres_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
