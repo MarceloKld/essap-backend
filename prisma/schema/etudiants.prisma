@@ -49,6 +49,7 @@ model Inscription {
   classeId        Int             @map("classe_id")
   institutId     Int             @map("institut_id")
   type            TypeInscription
+  decision        DecisionPassage? // décision du SGAC (réinscription)
   dateInscription DateTime        @default(now()) @map("date_inscription") @db.Timestamptz(3)
   annuleeLe       DateTime?       @map("annulee_le") @db.Timestamptz(3)
   creePar         String?         @map("cree_par") @db.Uuid

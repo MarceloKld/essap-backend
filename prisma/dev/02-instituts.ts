@@ -37,7 +37,7 @@ export default async function peuplerInstituts(prisma: Client): Promise<void> {
     create: {
       institutId: institut.id,
       cle: 'matricule.format',
-      valeur: { prefixe: 'DMOB', longueurSequence: 5 },
+      valeur: { prefixe: 'DMOB', longueurSequence: 4 },
       description: 'Préfixe + année + classe + numéro de séquence',
     },
   });
@@ -76,8 +76,8 @@ export default async function peuplerInstituts(prisma: Client): Promise<void> {
 
   // Deux étudiants fictifs pour DEMO-B
   const etudiants = [
-    { matricule: 'DMOB2026L10001', nom: 'Kasongo', postnom: 'Banza', prenom: 'Alain', sexe: 'M', naissance: '2003-05-12' },
-    { matricule: 'DMOB2026L10002', nom: 'Nsimba', postnom: 'Lutete', prenom: 'Clarisse', sexe: 'F', naissance: '2004-12-01' },
+    { matricule: 'DB26L101', nom: 'Kasongo', postnom: 'Banza', prenom: 'Alain', sexe: 'M', naissance: '2003-05-12' },
+    { matricule: 'DB26L102', nom: 'Nsimba', postnom: 'Lutete', prenom: 'Clarisse', sexe: 'F', naissance: '2004-12-01' },
   ] as const;
   for (const e of etudiants) {
     const etudiant = await prisma.etudiant.upsert({

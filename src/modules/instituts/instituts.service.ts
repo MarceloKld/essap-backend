@@ -160,7 +160,7 @@ export class InstitutsService {
             data: {
               institutId: institut.id,
               cle: 'matricule.format',
-              valeur: { prefixe: dto.prefixeMatricule, longueurSequence: 5 },
+              valeur: { prefixe: dto.prefixeMatricule, longueurSequence: 4 },
               description: 'Préfixe + année + classe + numéro de séquence',
               modifiePar: utilisateur.sub,
             },

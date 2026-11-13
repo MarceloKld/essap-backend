@@ -87,7 +87,7 @@
         "auth": { "type": "noauth" },
         "method": "POST",
         "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"matricule\": \"DEMO2026L10001\",\n  \"dateNaissance\": \"2004-03-15\"\n}" },
+        "body": { "mode": "raw", "raw": "{\n  \"matricule\": \"DM26L101\",\n  \"dateNaissance\": \"2004-03-15\"\n}" },
         "url": { "raw": "{{baseUrl}}/api/v1/auth/connexion-etudiant", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "connexion-etudiant"] }
       }
     },

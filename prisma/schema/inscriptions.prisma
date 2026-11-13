@@ -1,0 +1,8 @@
+// Décision prise par le SGAC lors d'une réinscription (§12 du cahier des charges).
+enum DecisionPassage {
+  PASSAGE        // passe à la classe supérieure
+  REDOUBLEMENT   // refait la même classe
+  REPRISE        // revient après une absence (classe choisie par le SGAC)
+
+  @@map("decision_passage")
+}
