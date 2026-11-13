@@ -15,6 +15,12 @@ function T-Garder([string]$variable, [string]$expression) {
 }
 
 # --- Décrit UNE requête de test ---
+#  -Corps    : objet JSON envoyé
+#  -Fichier  : fichier envoyé en multipart, ex. @{ champ = 'fichier'; chemin = 'fichiers-test/logo-test.png' }
+#  -Entetes  : en-têtes supplémentaires
+#  -Avant    : JavaScript exécuté AVANT l'envoi
+#  -Tests    : JavaScript de vérification APRÈS la réponse
+#  -SansAuth : ne pas envoyer de jeton
 function Req {
     param(
         [Parameter(Mandatory)][string]$Dossier,
@@ -22,12 +28,13 @@ function Req {
         [Parameter(Mandatory)][string]$Methode,
         [Parameter(Mandatory)][string]$Chemin,
         $Corps = $null,
+        $Fichier = $null,
         $Entetes = $null,
         $Avant = $null,
         $Tests = $null,
         [switch]$SansAuth
     )
-    return @{ dossier = $Dossier; nom = $Nom; methode = $Methode; chemin = $Chemin; corps = $Corps
+    return @{ dossier = $Dossier; nom = $Nom; methode = $Methode; chemin = $Chemin; corps = $Corps; fichier = $Fichier
               entetes = $Entetes; avant = $Avant; tests = $Tests; sansAuth = [bool]$SansAuth }
 }
 
@@ -62,6 +69,13 @@ function Nouvelle-CollectionPostman {
         if ($r.corps) {
             $requete['body'] = [ordered]@{
                 mode = 'raw'; raw = ($r.corps | ConvertTo-Json -Depth 10); options = @{ raw = @{ language = 'json' } }
+            }
+        }
+        if ($r.fichier) {
+            # Pas d'en-tête Content-Type ici : Postman le fabrique tout seul (multipart + séparateur)
+            $requete['body'] = [ordered]@{
+                mode = 'formdata'
+                formdata = @(@{ key = $r.fichier.champ; type = 'file'; src = $r.fichier.chemin })
             }
         }
         if ($r.sansAuth) { $requete['auth'] = @{ type = 'noauth' } }

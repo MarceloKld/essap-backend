@@ -1,0 +1,366 @@
+{
+    "info":  {
+                 "name":  "ESSAP - Tests B4b (logo)",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "auth":  {
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "type":  "string",
+                                    "value":  "{{accessToken}}"
+                                }
+                            ],
+                 "type":  "bearer"
+             },
+    "event":  [
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "// À coller dans : collection \u003e Scripts \u003e Pre-request",
+                                                  "// Avant CHAQUE requête : rafraîchit le jeton d\u0027accès s\u0027il est expiré (ou proche de l\u0027être).",
+                                                  "var sansJeton = [\u0027/auth/connexion\u0027, \u0027/auth/connexion-etudiant\u0027, \u0027/auth/rafraichir\u0027, \u0027/auth/deconnexion\u0027, \u0027/sante\u0027];",
+                                                  "var chemin = pm.request.url.getPath();",
+                                                  "var ignorer = sansJeton.some(function (c) { return chemin.endsWith(c); });",
+                                                  "var expire = Number(pm.environment.get(\u0027accessExpireAt\u0027) || 0);",
+                                                  "",
+                                                  "if (!ignorer \u0026\u0026 Date.now() \u003e expire - 30000) {",
+                                                  "  pm.sendRequest({ url: pm.environment.get(\u0027baseUrl\u0027) + \u0027/api/v1/auth/rafraichir\u0027, method: \u0027POST\u0027 }, function (err, res) {",
+                                                  "    if (!err \u0026\u0026 res.code === 200) {",
+                                                  "      var j = res.json();",
+                                                  "      pm.environment.set(\u0027accessToken\u0027, j.jetonAcces);",
+                                                  "      pm.environment.set(\u0027accessExpireAt\u0027, String(Date.now() + j.expireDansSecondes * 1000));",
+                                                  "    }",
+                                                  "  });",
+                                                  "}"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "prerequest"
+                  },
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "// À coller dans : collection \u003e Scripts \u003e Post-response",
+                                                  "// Après CHAQUE requête : si la réponse contient un jeton d\u0027accès, on le range dans l\u0027environnement.",
+                                                  "if (pm.response.code === 200) {",
+                                                  "  try {",
+                                                  "    var j = pm.response.json();",
+                                                  "    if (j \u0026\u0026 j.jetonAcces) {",
+                                                  "      pm.environment.set(\u0027accessToken\u0027, j.jetonAcces);",
+                                                  "      pm.environment.set(\u0027accessExpireAt\u0027, String(Date.now() + j.expireDansSecondes * 1000));",
+                                                  "    }",
+                                                  "  } catch (e) { /* la réponse n\u0027est pas du JSON : on ignore */ }",
+                                                  "}"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "test"
+                  }
+              ],
+    "item":  [
+                 {
+                     "name":  "A. Preparation",
+                     "item":  [
+                                  {
+                                      "name":  "01 - Connexion dg.demo",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/auth/connexion",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "auth",
+                                                                               "connexion"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"motDePasse\":  \"Essap@Dev2026\",\r\n    \"identifiant\":  \"dg.demo\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02 - Identifiant de DEMO-LOCAL",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "if (j) { pm.environment.set(\u0027institutDemoId\u0027, String(j.donnees[0].id)); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts?q=DEMO-LOCAL",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "q",
+                                                                                    "value":  "DEMO-LOCAL"
+                                                                                }
+                                                                            ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "B. Logo",
+                     "item":  [
+                                  {
+                                      "name":  "03 - Sans fichier : 400, message Aucun fichier",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });",
+                                                                                    "pm.test(\u0027Message : aucun fichier\u0027, function () { pm.expect(j.message).to.include(\u0027Aucun fichier\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}/logo",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}",
+                                                                               "logo"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04 - Faux logo : 400, message pas une image",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 400\u0027, function () { pm.response.to.have.status(400); });",
+                                                                                    "pm.test(\u0027Message : pas une image\u0027, function () { pm.expect(j.message).to.include(\u0027pas une image\u0027); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}/logo",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}",
+                                                                               "logo"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "formdata",
+                                                                   "formdata":  [
+                                                                                    {
+                                                                                        "key":  "fichier",
+                                                                                        "type":  "file",
+                                                                                        "src":  "fichiers-test/faux-logo.png"
+                                                                                    }
+                                                                                ]
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05 - Fichier de 6 Mo : 413",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 413\u0027, function () { pm.response.to.have.status(413); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}/logo",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}",
+                                                                               "logo"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "formdata",
+                                                                   "formdata":  [
+                                                                                    {
+                                                                                        "key":  "fichier",
+                                                                                        "type":  "file",
+                                                                                        "src":  "fichiers-test/trop-gros.png"
+                                                                                    }
+                                                                                ]
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "06 - Vrai logo : 200, WebP, 512 px max (Cloudinary requis)",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Adresse Cloudinary\u0027, function () { pm.expect(j.logoUrl).to.include(\u0027cloudinary\u0027); });",
+                                                                                    "pm.test(\u0027WebP, 512 pixels maximum\u0027, function () { pm.expect(j.final.format).to.eql(\u0027webp\u0027); pm.expect(j.final.largeur).to.be.at.most(512); });",
+                                                                                    "pm.test(\u0027Image reduite\u0027, function () { pm.expect(j.final.octets).to.be.below(j.original.octets); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}/logo",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}",
+                                                                               "logo"
+                                                                           ]
+                                                              },
+                                                      "body":  {
+                                                                   "mode":  "formdata",
+                                                                   "formdata":  [
+                                                                                    {
+                                                                                        "key":  "fichier",
+                                                                                        "type":  "file",
+                                                                                        "src":  "fichiers-test/logo-test.png"
+                                                                                    }
+                                                                                ]
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "07 - Supprimer le logo",
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "var j = null; try { j = pm.response.json(); } catch (e) { }",
+                                                                                    "pm.test(\u0027Statut HTTP 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Plus de logo\u0027, function () { pm.expect(j.logoUrl).to.eql(null); });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/instituts/{{institutDemoId}}/logo",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "instituts",
+                                                                               "{{institutDemoId}}",
+                                                                               "logo"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}

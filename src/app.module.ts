@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
 import { InstitutsModule } from './modules/instituts/instituts.module.js';
 import { SanteModule } from './modules/sante/sante.module.js';
+import { UtilisateursModule } from './modules/utilisateurs/utilisateurs.module.js';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SanteModule } from './modules/sante/sante.module.js';
     AuditModule,
     AuthModule,
     InstitutsModule,
+    UtilisateursModule,
     SanteModule,
   ],
   providers: [
