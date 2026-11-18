@@ -16,7 +16,7 @@ import type { ModifierInstitutDto } from './dto/modifier-institut.dto.js';
 // Champs d'un institut renvoyés par l'API (on choisit explicitement, jamais "tout").
 const CHAMPS_INSTITUT = {
   id: true, code: true, nom: true, sigle: true, adresse: true, telephone: true,
-  email: true, logoUrl: true, estPrincipal: true, actif: true, creeLe: true,
+  email: true, telephone2: true, logoUrl: true, estPrincipal: true, actif: true, creeLe: true,
 } satisfies Prisma.InstitutSelect;
 
 // Personnel : JAMAIS le mot de passe haché, même par erreur.
@@ -239,6 +239,16 @@ export class InstitutsService {
       const tel = normaliserTelephone(dto.telephone);
       if (!tel) throw new BadRequestException('Téléphone invalide.');
       data.telephone = tel;
+    }
+    if (dto.telephone2 !== undefined) {
+      const tel2 = normaliserTelephone(dto.telephone2);
+      if (!tel2) throw new BadRequestException('Deuxième téléphone invalide.');
+      data.telephone2 = tel2;
+    }
+    if (dto.telephone2 !== undefined) {
+      const tel2 = normaliserTelephone(dto.telephone2);
+      if (!tel2) throw new BadRequestException('Deuxième téléphone invalide.');
+      data.telephone2 = tel2;
     }
     if (Object.keys(data).length === 0) throw new BadRequestException('Aucune modification fournie.');
 
