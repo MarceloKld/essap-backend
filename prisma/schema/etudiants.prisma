@@ -1,35 +1,48 @@
 // ============================================================
-//  ÉTUDIANTS ET INSCRIPTIONS
+//  ÉTUDIANTS ET INSCRIPTIONS (champs calqués sur la fiche d'inscription ESSAP)
 // ============================================================
 
-// Aucune photo : l'avatar dépend uniquement du sexe (§4 de ton cahier).
 model Etudiant {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  institutId     Int            @map("institut_id")
-  // Le matricule est vide tant que la demande n'est pas finalisée sur place.
-  // Ensuite il est unique, à vie, et jamais réutilisé.
-  matricule       String?        @unique @db.VarChar(30)
-  nom             String         @db.VarChar(80)
-  postnom         String?        @db.VarChar(80)
-  prenom          String?        @db.VarChar(80)
-  sexe            Sexe
-  dateNaissance   DateTime       @map("date_naissance") @db.Date  // 2e facteur de connexion
-  lieuNaissance   String?        @map("lieu_naissance") @db.VarChar(100)
-  nationalite     String?        @db.VarChar(60)
-  telephone       String?        @db.VarChar(30)
-  email           String?        @db.VarChar(150)
-  adresse         String?        @db.VarChar(255)
-  nomTuteur       String?        @map("nom_tuteur") @db.VarChar(150)
-  telephoneTuteur String?        @map("telephone_tuteur") @db.VarChar(30)
-  domaineEtude    String         @default("Assistant en pharmacie") @map("domaine_etude") @db.VarChar(100)
-  statut          StatutEtudiant @default(CANDIDAT)
-  estImporte      Boolean        @default(false) @map("est_importe") // étudiant existant repris
-  creePar         String?        @map("cree_par") @db.Uuid
-  creeLe          DateTime       @default(now()) @map("cree_le") @db.Timestamptz(3)
-  modifieLe       DateTime       @updatedAt @map("modifie_le") @db.Timestamptz(3)
-  supprimeLe      DateTime?      @map("supprime_le") @db.Timestamptz(3)
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  institutId    Int            @map("institut_id")
+  // Vide tant que la demande n'est pas finalisée sur place. Ensuite : unique, à vie, jamais réutilisé.
+  matricule     String?        @unique @db.VarChar(30)
 
-  institut      Institut       @relation(fields: [institutId], references: [id])
+  // 1. Identification du candidat
+  nom           String         @db.VarChar(80)
+  postnom       String?        @db.VarChar(80)
+  prenom        String?        @db.VarChar(80)
+  sexe          Sexe
+  dateNaissance DateTime       @map("date_naissance") @db.Date // sert aussi à la connexion étudiant
+  lieuNaissance String?        @map("lieu_naissance") @db.VarChar(100)
+  nationalite   String?        @db.VarChar(60)
+  etatCivil     EtatCivil?     @map("etat_civil")
+  telephone     String?        @db.VarChar(30)
+  email         String?        @db.VarChar(150)
+  adresse       String?        @db.VarChar(255) // « Adresse / Commune »
+  contactUrgenceNom       String? @map("contact_urgence_nom") @db.VarChar(150)
+  contactUrgenceTelephone String? @map("contact_urgence_telephone") @db.VarChar(30)
+
+  // 2. Parcours scolaire et académique
+  dernierDiplome       String? @map("dernier_diplome") @db.VarChar(150)
+  anneeObtention       Int?    @map("annee_obtention")
+  etablissementOrigine String? @map("etablissement_origine") @db.VarChar(150)
+  villePaysOrigine     String? @map("ville_pays_origine") @db.VarChar(100)
+
+  // Photo de profil et vérification du profil (utilisés à partir de B5b)
+  photoCle        String?   @map("photo_cle") @db.VarChar(200) // clé du fichier dans le stockage (R2)
+  photoMajLe      DateTime? @map("photo_maj_le") @db.Timestamptz(3)
+  profilVerifieLe DateTime? @map("profil_verifie_le") @db.Timestamptz(3) // vide = l'étudiant n'a jamais vérifié son profil
+  profilRemarque  String?   @map("profil_remarque") @db.VarChar(500)     // erreur signalée par l'étudiant
+
+  statut        StatutEtudiant @default(CANDIDAT)
+  estImporte    Boolean        @default(false) @map("est_importe") // étudiant existant repris
+  creePar       String?        @map("cree_par") @db.Uuid
+  creeLe        DateTime       @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe     DateTime       @updatedAt @map("modifie_le") @db.Timestamptz(3)
+  supprimeLe    DateTime?      @map("supprime_le") @db.Timestamptz(3)
+
+  institut       Institut       @relation(fields: [institutId], references: [id])
   compte         CompteEtudiant?
   inscriptions   Inscription[]
   statutsAnnuels StatutAnnuel[]
@@ -40,16 +53,18 @@ model Etudiant {
   @@map("etudiants")
 }
 
-// Inscription = étudiant x année x classe. Un étudiant n'a qu'UNE inscription par année
-// (même s'il redouble : l'année change, donc c'est une autre ligne).
+// Inscription = étudiant x année x classe. Un étudiant n'a qu'UNE inscription par année.
 model Inscription {
   id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   etudiantId      String          @map("etudiant_id") @db.Uuid
   anneeId         Int             @map("annee_id")
   classeId        Int             @map("classe_id")
-  institutId     Int             @map("institut_id")
+  institutId      Int             @map("institut_id")
   type            TypeInscription
-  decision        DecisionPassage? // décision du SGAC (réinscription)
+  decision        DecisionPassage?
+  // 4. Pièces à fournir : codes cochés sur la fiche (DIPLOME, IDENTITE, PHOTOS, AUTRES). Aucun fichier n'est stocké.
+  piecesFournies  String[]        @default([]) @map("pieces_fournies")
+  faitA           String?         @map("fait_a") @db.VarChar(100) // « Fait à : ... » en bas de la fiche
   dateInscription DateTime        @default(now()) @map("date_inscription") @db.Timestamptz(3)
   annuleeLe       DateTime?       @map("annulee_le") @db.Timestamptz(3)
   creePar         String?         @map("cree_par") @db.Uuid
@@ -59,7 +74,7 @@ model Inscription {
   etudiant  Etudiant      @relation(fields: [etudiantId], references: [id])
   annee     AnneeScolaire @relation(fields: [anneeId], references: [id])
   classe    Classe        @relation(fields: [classeId], references: [id])
-  institut Institut     @relation(fields: [institutId], references: [id])
+  institut  Institut      @relation(fields: [institutId], references: [id])
   paiements Paiement[]
 
   @@unique([etudiantId, anneeId])
@@ -68,7 +83,6 @@ model Inscription {
 }
 
 // Statut de l'étudiant pour chaque année : inscrit, absent, abandon, diplômé.
-// Les années manquantes restent visibles dans le parcours (§16).
 model StatutAnnuel {
   id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   etudiantId String     @map("etudiant_id") @db.Uuid
@@ -84,20 +98,16 @@ model StatutAnnuel {
   @@map("statuts_annuels")
 }
 
-// Compteur de matricules. Une ligne par institut x année x classe.
-// Le service la verrouillera dans une TRANSACTION pour que deux secrétaires
-// ne reçoivent jamais le même numéro (étape B5).
+// Compteur de matricules : UNE ligne par institut et par année (plus de classe : ES260015).
 model SequenceMatricule {
-  id           Int @id @default(autoincrement())
-  institutId  Int @map("institut_id")
-  anneeId      Int @map("annee_id")
-  classeId     Int @map("classe_id")
+  id            Int @id @default(autoincrement())
+  institutId    Int @map("institut_id")
+  anneeId       Int @map("annee_id")
   dernierNumero Int @default(0) @map("dernier_numero")
 
-  institut Institut     @relation(fields: [institutId], references: [id])
-  annee     AnneeScolaire @relation(fields: [anneeId], references: [id])
-  classe    Classe        @relation(fields: [classeId], references: [id])
+  institut Institut      @relation(fields: [institutId], references: [id])
+  annee    AnneeScolaire @relation(fields: [anneeId], references: [id])
 
-  @@unique([institutId, anneeId, classeId])
+  @@unique([institutId, anneeId])
   @@map("sequences_matricule")
 }

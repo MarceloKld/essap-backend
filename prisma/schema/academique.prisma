@@ -1,0 +1,60 @@
+// ============================================================
+//  STRUCTURE ACADÉMIQUE, configurée par le Super Admin dans CHAQUE institut :
+//  Domaine (ex. Sciences de la santé)  ->  Filière (ex. Assistance en pharmacie)  ->  Classes (L1, L2, L3, M1, M2...)
+// ============================================================
+
+model Domaine {
+  id         Int      @id @default(autoincrement())
+  institutId Int      @map("institut_id")
+  code       String   @db.VarChar(20)
+  libelle    String   @db.VarChar(150)
+  actif      Boolean  @default(true)
+  creeLe     DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe  DateTime @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  institut Institut  @relation(fields: [institutId], references: [id])
+  filieres Filiere[]
+
+  @@unique([institutId, code])
+  @@map("domaines")
+}
+
+model Filiere {
+  id         Int      @id @default(autoincrement())
+  institutId Int      @map("institut_id")
+  domaineId  Int      @map("domaine_id")
+  code       String   @db.VarChar(20)
+  libelle    String   @db.VarChar(150)
+  actif      Boolean  @default(true)
+  creeLe     DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+  modifieLe  DateTime @updatedAt @map("modifie_le") @db.Timestamptz(3)
+
+  institut Institut @relation(fields: [institutId], references: [id])
+  domaine  Domaine  @relation(fields: [domaineId], references: [id])
+  classes  Classe[]
+
+  @@unique([institutId, code])
+  @@index([domaineId])
+  @@map("filieres")
+}
+
+// Une classe appartient à UNE filière. « ordre » sert à trouver la classe suivante (passage L1 -> L2).
+model Classe {
+  id         Int      @id @default(autoincrement())
+  institutId Int      @map("institut_id")
+  filiereId  Int      @map("filiere_id")
+  code       String   @db.VarChar(10)
+  libelle    String   @db.VarChar(60)
+  ordre      Int
+  actif      Boolean  @default(true)
+  creeLe     DateTime @default(now()) @map("cree_le") @db.Timestamptz(3)
+
+  institut     Institut      @relation(fields: [institutId], references: [id])
+  filiere      Filiere       @relation(fields: [filiereId], references: [id])
+  inscriptions Inscription[]
+  frais        Frais[]
+
+  @@unique([filiereId, code])
+  @@index([institutId])
+  @@map("classes")
+}

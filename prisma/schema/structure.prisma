@@ -1,23 +1,23 @@
 // ============================================================
-//  STRUCTURE : INSTITUTS, ANNÃ‰ES, CLASSES, PARAMÃˆTRES
+//  STRUCTURE : INSTITUTS, ACCÈS, ANNÉES, PARAMÈTRES
+//  (domaines, filières et classes : voir academique.prisma)
 // ============================================================
 
-// Un institut = un Ã©tablissement ou un site (le siÃ¨ge, une extension).
-// C'est le Â« locataire Â» (tenant) du logiciel : presque toutes les donnÃ©es portent un
-// institut_id, ce qui isole les instituts les uns des autres.
+// Un institut = un établissement ou un site. C'est le « locataire » du logiciel :
+// presque toutes les données portent un institut_id, ce qui isole les instituts entre eux.
 model Institut {
   id           Int       @id @default(autoincrement())
   code         String    @unique @db.VarChar(20)
   nom          String    @db.VarChar(150)
   sigle        String?   @db.VarChar(20)
-  adresse      String?   @db.VarChar(255)
+  adresse      String?   @db.VarChar(255) // imprimée sur la fiche : « Lieu d'inscription »
   telephone    String?   @db.VarChar(30)
+  telephone2   String?   @map("telephone_2") @db.VarChar(30)
   email        String?   @db.VarChar(150)
-  // Logo hÃ©bergÃ© sur Cloudinary. On garde l'URL (pour l'afficher) ET l'identifiant
-  // public (pour pouvoir remplacer ou supprimer l'image plus tard).
+  // Logo : adresse publique + clé du fichier dans le stockage (Cloudinary aujourd'hui, R2 en B5b)
   logoUrl      String?   @map("logo_url") @db.VarChar(500)
   logoIdPublic String?   @map("logo_id_public") @db.VarChar(200)
-  estPrincipal Boolean   @default(false) @map("est_principal") // le siÃ¨ge
+  estPrincipal Boolean   @default(false) @map("est_principal")
   actif        Boolean   @default(true)
   creeLe       DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
   modifieLe    DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
@@ -27,6 +27,9 @@ model Institut {
   accesInstituts     AccesInstitut[]
   anneesScolaires    AnneeScolaire[]
   parametres         Parametre[]
+  domaines           Domaine[]
+  filieres           Filiere[]
+  classes            Classe[]
   etudiants          Etudiant[]
   inscriptions       Inscription[]
   frais              Frais[]
@@ -37,8 +40,7 @@ model Institut {
   @@map("instituts")
 }
 
-// Liste des instituts auxquels un utilisateur a accÃ¨s (utile surtout au DG,
-// qui gÃ¨re plusieurs instituts). ClÃ© composÃ©e : un couple utilisateur/institut n'existe qu'une fois.
+// Instituts auxquels un utilisateur a accès (surtout le DG, qui en gère plusieurs).
 model AccesInstitut {
   utilisateurId String   @map("utilisateur_id") @db.Uuid
   institutId    Int      @map("institut_id")
@@ -52,9 +54,8 @@ model AccesInstitut {
   @@map("acces_instituts")
 }
 
-// L'annÃ©e scolaire est la clÃ© de traÃ§abilitÃ© de tout le logiciel (Â§16).
-// Elle est PROPRE Ã€ CHAQUE INSTITUT : clÃ´turer 2026-2027 dans l'institut TEST
-// ne touche jamais l'annÃ©e du vrai institut.
+// L'année scolaire est PROPRE À CHAQUE INSTITUT : clôturer 2026-2027 dans un institut
+// ne touche jamais l'année d'un autre.
 model AnneeScolaire {
   id          Int       @id @default(autoincrement())
   institutId  Int       @map("institut_id")
@@ -62,7 +63,7 @@ model AnneeScolaire {
   dateDebut   DateTime  @map("date_debut") @db.Date
   dateFin     DateTime  @map("date_fin") @db.Date
   estActive   Boolean   @default(false) @map("est_active")
-  estCloturee Boolean   @default(false) @map("est_cloturee") // clÃ´turÃ©e = lecture seule
+  estCloturee Boolean   @default(false) @map("est_cloturee")
   clotureLe   DateTime? @map("cloture_le") @db.Timestamptz(3)
   creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(3)
   modifieLe   DateTime  @updatedAt @map("modifie_le") @db.Timestamptz(3)
@@ -78,23 +79,7 @@ model AnneeScolaire {
   @@map("annees_scolaires")
 }
 
-// Table de rÃ©fÃ©rence COMMUNE Ã  tous les instituts. Extensible : M1 et M2
-// s'ajouteront par une simple ligne, sans toucher au code.
-model Classe {
-  id      Int     @id @default(autoincrement())
-  code    String  @unique @db.VarChar(10) // L1, L2, L3, plus tard M1, M2
-  libelle String  @db.VarChar(60)
-  ordre   Int     // 1, 2, 3... sert Ã  savoir quelle est la classe suivante
-  actif   Boolean @default(true)
-
-  inscriptions       Inscription[]
-  frais              Frais[]
-  sequencesMatricule SequenceMatricule[]
-
-  @@map("classes")
-}
-
-// RÃ©glages sous forme clÃ© / valeur, PAR INSTITUT (format du matricule, seuils, etc.)
+// Réglages clé / valeur PAR INSTITUT (format du matricule, seuils...).
 model Parametre {
   id          Int      @id @default(autoincrement())
   institutId  Int      @map("institut_id")

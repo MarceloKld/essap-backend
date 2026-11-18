@@ -21,7 +21,7 @@ export class ModifierInstitutDto {
   @MaxLength(20)
   sigle?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: "Imprimée sur la fiche d'inscription (« Lieu d'inscription »)" })
   @IsOptional()
   @Transform(nettoyer)
   @IsString()
@@ -34,6 +34,13 @@ export class ModifierInstitutDto {
   @IsString()
   @MaxLength(30)
   telephone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(nettoyer)
+  @IsString()
+  @MaxLength(30)
+  telephone2?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

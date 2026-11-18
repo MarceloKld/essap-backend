@@ -25,6 +25,53 @@ CREATE TYPE "statut_paiement" AS ENUM ('EN_ATTENTE', 'VALIDE', 'ANNULE');
 -- CreateEnum
 CREATE TYPE "statut_recu" AS ENUM ('VALIDE', 'REMPLACE');
 
+-- CreateEnum
+CREATE TYPE "decision_passage" AS ENUM ('PASSAGE', 'REDOUBLEMENT', 'REPRISE');
+
+-- CreateEnum
+CREATE TYPE "etat_civil" AS ENUM ('CELIBATAIRE', 'MARIE', 'AUTRE');
+
+-- CreateTable
+CREATE TABLE "domaines" (
+    "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
+    "code" VARCHAR(20) NOT NULL,
+    "libelle" VARCHAR(150) NOT NULL,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "cree_le" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modifie_le" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "domaines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "filieres" (
+    "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
+    "domaine_id" INTEGER NOT NULL,
+    "code" VARCHAR(20) NOT NULL,
+    "libelle" VARCHAR(150) NOT NULL,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "cree_le" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modifie_le" TIMESTAMPTZ(3) NOT NULL,
+
+    CONSTRAINT "filieres_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "classes" (
+    "id" SERIAL NOT NULL,
+    "institut_id" INTEGER NOT NULL,
+    "filiere_id" INTEGER NOT NULL,
+    "code" VARCHAR(10) NOT NULL,
+    "libelle" VARCHAR(60) NOT NULL,
+    "ordre" INTEGER NOT NULL,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "cree_le" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "classes_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateTable
 CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
@@ -122,12 +169,20 @@ CREATE TABLE "etudiants" (
     "date_naissance" DATE NOT NULL,
     "lieu_naissance" VARCHAR(100),
     "nationalite" VARCHAR(60),
+    "etat_civil" "etat_civil",
     "telephone" VARCHAR(30),
     "email" VARCHAR(150),
     "adresse" VARCHAR(255),
-    "nom_tuteur" VARCHAR(150),
-    "telephone_tuteur" VARCHAR(30),
-    "domaine_etude" VARCHAR(100) NOT NULL DEFAULT 'Assistant en pharmacie',
+    "contact_urgence_nom" VARCHAR(150),
+    "contact_urgence_telephone" VARCHAR(30),
+    "dernier_diplome" VARCHAR(150),
+    "annee_obtention" INTEGER,
+    "etablissement_origine" VARCHAR(150),
+    "ville_pays_origine" VARCHAR(100),
+    "photo_cle" VARCHAR(200),
+    "photo_maj_le" TIMESTAMPTZ(3),
+    "profil_verifie_le" TIMESTAMPTZ(3),
+    "profil_remarque" VARCHAR(500),
     "statut" "statut_etudiant" NOT NULL DEFAULT 'CANDIDAT',
     "est_importe" BOOLEAN NOT NULL DEFAULT false,
     "cree_par" UUID,
@@ -146,6 +201,9 @@ CREATE TABLE "inscriptions" (
     "classe_id" INTEGER NOT NULL,
     "institut_id" INTEGER NOT NULL,
     "type" "type_inscription" NOT NULL,
+    "decision" "decision_passage",
+    "pieces_fournies" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "fait_a" VARCHAR(100),
     "date_inscription" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "annulee_le" TIMESTAMPTZ(3),
     "cree_par" UUID,
@@ -172,7 +230,6 @@ CREATE TABLE "sequences_matricule" (
     "id" SERIAL NOT NULL,
     "institut_id" INTEGER NOT NULL,
     "annee_id" INTEGER NOT NULL,
-    "classe_id" INTEGER NOT NULL,
     "dernier_numero" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "sequences_matricule_pkey" PRIMARY KEY ("id")
@@ -285,6 +342,7 @@ CREATE TABLE "instituts" (
     "sigle" VARCHAR(20),
     "adresse" VARCHAR(255),
     "telephone" VARCHAR(30),
+    "telephone_2" VARCHAR(30),
     "email" VARCHAR(150),
     "logo_url" VARCHAR(500),
     "logo_id_public" VARCHAR(200),
@@ -323,17 +381,6 @@ CREATE TABLE "annees_scolaires" (
 );
 
 -- CreateTable
-CREATE TABLE "classes" (
-    "id" SERIAL NOT NULL,
-    "code" VARCHAR(10) NOT NULL,
-    "libelle" VARCHAR(60) NOT NULL,
-    "ordre" INTEGER NOT NULL,
-    "actif" BOOLEAN NOT NULL DEFAULT true,
-
-    CONSTRAINT "classes_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "parametres" (
     "id" SERIAL NOT NULL,
     "institut_id" INTEGER NOT NULL,
@@ -345,6 +392,21 @@ CREATE TABLE "parametres" (
 
     CONSTRAINT "parametres_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "domaines_institut_id_code_key" ON "domaines"("institut_id", "code");
+
+-- CreateIndex
+CREATE INDEX "filieres_domaine_id_idx" ON "filieres"("domaine_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "filieres_institut_id_code_key" ON "filieres"("institut_id", "code");
+
+-- CreateIndex
+CREATE INDEX "classes_institut_id_idx" ON "classes"("institut_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "classes_filiere_id_code_key" ON "classes"("filiere_id", "code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "roles_code_key" ON "roles"("code");
@@ -410,7 +472,7 @@ CREATE UNIQUE INDEX "inscriptions_etudiant_id_annee_id_key" ON "inscriptions"("e
 CREATE UNIQUE INDEX "statuts_annuels_etudiant_id_annee_id_key" ON "statuts_annuels"("etudiant_id", "annee_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "sequences_matricule_institut_id_annee_id_classe_id_key" ON "sequences_matricule"("institut_id", "annee_id", "classe_id");
+CREATE UNIQUE INDEX "sequences_matricule_institut_id_annee_id_key" ON "sequences_matricule"("institut_id", "annee_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_frais_code_key" ON "categories_frais"("code");
@@ -455,10 +517,22 @@ CREATE INDEX "acces_instituts_institut_id_idx" ON "acces_instituts"("institut_id
 CREATE UNIQUE INDEX "annees_scolaires_institut_id_libelle_key" ON "annees_scolaires"("institut_id", "libelle");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "classes_code_key" ON "classes"("code");
-
--- CreateIndex
 CREATE UNIQUE INDEX "parametres_institut_id_cle_key" ON "parametres"("institut_id", "cle");
+
+-- AddForeignKey
+ALTER TABLE "domaines" ADD CONSTRAINT "domaines_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "filieres" ADD CONSTRAINT "filieres_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "filieres" ADD CONSTRAINT "filieres_domaine_id_fkey" FOREIGN KEY ("domaine_id") REFERENCES "domaines"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "classes" ADD CONSTRAINT "classes_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "classes" ADD CONSTRAINT "classes_filiere_id_fkey" FOREIGN KEY ("filiere_id") REFERENCES "filieres"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "utilisateurs" ADD CONSTRAINT "utilisateurs_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -504,9 +578,6 @@ ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_institut_i
 
 -- AddForeignKey
 ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_annee_id_fkey" FOREIGN KEY ("annee_id") REFERENCES "annees_scolaires"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "sequences_matricule" ADD CONSTRAINT "sequences_matricule_classe_id_fkey" FOREIGN KEY ("classe_id") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "frais" ADD CONSTRAINT "frais_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -567,3 +638,6 @@ ALTER TABLE "annees_scolaires" ADD CONSTRAINT "annees_scolaires_institut_id_fkey
 
 -- AddForeignKey
 ALTER TABLE "parametres" ADD CONSTRAINT "parametres_institut_id_fkey" FOREIGN KEY ("institut_id") REFERENCES "instituts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Une seule annee scolaire ACTIVE par institut.
+CREATE UNIQUE INDEX "uq_annee_active_par_institut" ON "annees_scolaires" ("institut_id") WHERE "est_active" = true;

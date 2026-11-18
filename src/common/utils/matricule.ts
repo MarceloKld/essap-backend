@@ -1,6 +1,6 @@
 export interface FormatMatricule {
   prefixe: string; // ex. « ES »
-  longueurSequence: number; // ex. 2 -> « 01 »
+  longueurSequence: number; // ex. 4 -> « 0015 »
 }
 
 /** Lit le format enregistré en base (JSON). Renvoie null s'il est absent ou invalide. */
@@ -21,10 +21,10 @@ export function lireFormatMatricule(valeur: unknown): FormatMatricule | null {
 }
 
 /**
- * Assemble un matricule : préfixe + 2 derniers chiffres de l'année + classe + numéro.
- * Exemple : ('ES', '2026-2027', 'L1', 1, longueur 2) -> « ES26L101 ».
+ * Assemble un matricule : préfixe + 2 derniers chiffres de l'année + numéro.
+ * Exemple : ('ES', '2026-2027', 15, longueur 4) -> « ES260015 ».
  */
-export function formaterMatricule(format: FormatMatricule, libelleAnnee: string, codeClasse: string, numero: number): string {
+export function formaterMatricule(format: FormatMatricule, libelleAnnee: string, numero: number): string {
   const annee = libelleAnnee.slice(2, 4);
-  return `${format.prefixe}${annee}${codeClasse}${String(numero).padStart(format.longueurSequence, '0')}`;
+  return `${format.prefixe}${annee}${String(numero).padStart(format.longueurSequence, '0')}`;
 }

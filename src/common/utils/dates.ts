@@ -6,5 +6,15 @@ export function lireDateIso(texte: string): Date | null {
   return date;
 }
 
+/** Ancienne orthographe, gardée pour qu'aucun import ne casse. */
+export const lireDateISO = lireDateIso;
+
 /** Date -> « AAAA-MM-JJ » (format renvoyé par l'API). */
 export const versTexteDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+/** Date -> « 15/11/2026 » (format des documents imprimés). */
+export function formaterDateFr(date: Date): string {
+  const jour = String(date.getUTCDate()).padStart(2, '0');
+  const mois = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${jour}/${mois}/${date.getUTCFullYear()}`;
+}

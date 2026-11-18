@@ -6,3 +6,12 @@ enum DecisionPassage {
 
   @@map("decision_passage")
 }
+
+// État civil, comme sur la fiche d'inscription papier.
+enum EtatCivil {
+  CELIBATAIRE
+  MARIE
+  AUTRE
+
+  @@map("etat_civil")
+}
