@@ -1,11 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 const nettoyer = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
-/** Identité d'un étudiant. Aucune photo : l'avatar dépend du sexe (§4 du cahier). */
+export const ETATS_CIVILS = ['CELIBATAIRE', 'MARIE', 'AUTRE'] as const;
+
+/** Identité d'un étudiant : les sections 1 et 2 de la fiche d'inscription papier. */
 export class IdentiteEtudiantDto {
+  // ---- 1. Identification du candidat
   @ApiProperty({ example: 'Mukendi' })
   @Transform(nettoyer)
   @IsString()
@@ -49,6 +52,11 @@ export class IdentiteEtudiantDto {
   @MaxLength(60)
   nationalite?: string;
 
+  @ApiPropertyOptional({ enum: ETATS_CIVILS })
+  @IsOptional()
+  @IsIn(ETATS_CIVILS)
+  etatCivil?: 'CELIBATAIRE' | 'MARIE' | 'AUTRE';
+
   @ApiPropertyOptional({ example: '0812345678' })
   @IsOptional()
   @Transform(nettoyer)
@@ -63,24 +71,54 @@ export class IdentiteEtudiantDto {
   @MaxLength(150)
   email?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Adresse / Commune' })
   @IsOptional()
   @Transform(nettoyer)
   @IsString()
   @MaxLength(255)
   adresse?: string;
 
-  @ApiPropertyOptional({ description: 'Tuteur ou parent' })
+  @ApiPropertyOptional({ description: "Contact d'urgence : nom" })
   @IsOptional()
   @Transform(nettoyer)
   @IsString()
   @MaxLength(150)
-  nomTuteur?: string;
+  contactUrgenceNom?: string;
+
+  @ApiPropertyOptional({ description: "Contact d'urgence : téléphone" })
+  @IsOptional()
+  @Transform(nettoyer)
+  @IsString()
+  @MaxLength(30)
+  contactUrgenceTelephone?: string;
+
+  // ---- 2. Parcours scolaire et académique
+  @ApiPropertyOptional({ example: "Diplôme d'État" })
+  @IsOptional()
+  @Transform(nettoyer)
+  @IsString()
+  @MaxLength(150)
+  dernierDiplome?: string;
+
+  @ApiPropertyOptional({ example: 2023 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1950)
+  @Max(2100)
+  anneeObtention?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(nettoyer)
   @IsString()
-  @MaxLength(30)
-  telephoneTuteur?: string;
+  @MaxLength(150)
+  etablissementOrigine?: string;
+
+  @ApiPropertyOptional({ example: 'Kinshasa / RDC' })
+  @IsOptional()
+  @Transform(nettoyer)
+  @IsString()
+  @MaxLength(100)
+  villePaysOrigine?: string;
 }

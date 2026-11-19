@@ -8,7 +8,9 @@ import { reponsePaginee } from '../../common/dto/pagination.dto.js';
 import type { ChangerStatutDto } from './dto/changer-statut.dto.js';
 import type { ListerEtudiantsDto } from './dto/lister-etudiants.dto.js';
 import type { ModifierEtudiantDto } from './dto/modifier-etudiant.dto.js';
-import { CHAMPS_ETUDIANT, presenterEtudiant, telephoneOuErreur, verifierNaissance } from './etudiants.commun.js';
+import {
+  CHAMPS_ETUDIANT, presenterEtudiant, telephoneOuErreur, verifierAnneeObtention, verifierNaissance,
+} from './etudiants.commun.js';
 
 /** Toute requête est filtrée par institutId : un étudiant d'un autre institut n'existe tout simplement pas. */
 @Injectable()
@@ -25,13 +27,20 @@ export class EtudiantsService {
     const filtres: Prisma.EtudiantWhereInput[] = [];
     if (f.statut) filtres.push({ statut: f.statut });
     if (f.sexe) filtres.push({ sexe: f.sexe });
-    if (f.anneeId || f.classeCode) {
+    if (f.anneeId || f.classeCode || f.filiereCode) {
       filtres.push({
         inscriptions: {
           some: {
             annuleeLe: null,
             ...(f.anneeId ? { anneeId: f.anneeId } : {}),
-            ...(f.classeCode ? { classe: { code: f.classeCode } } : {}),
+            ...(f.classeCode || f.filiereCode
+              ? {
+                  classe: {
+                    ...(f.classeCode ? { code: f.classeCode } : {}),
+                    ...(f.filiereCode ? { filiere: { code: f.filiereCode } } : {}),
+                  },
+                }
+              : {}),
           },
         },
       });
@@ -55,12 +64,16 @@ export class EtudiantsService {
         where,
         select: {
           ...CHAMPS_ETUDIANT,
-          // Dernière inscription : classe et année « courantes » de l'étudiant
+          // Dernière inscription : classe, filière et année « courantes » de l'étudiant
           inscriptions: {
             where: { annuleeLe: null },
             orderBy: { annee: { dateDebut: 'desc' } },
             take: 1,
-            select: { type: true, decision: true, classe: { select: { code: true } }, annee: { select: { id: true, libelle: true } } },
+            select: {
+              type: true, decision: true,
+              classe: { select: { code: true, filiere: { select: { code: true } } } },
+              annee: { select: { id: true, libelle: true } },
+            },
           },
         },
         orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
@@ -76,6 +89,7 @@ export class EtudiantsService {
             type: inscriptions[0].type,
             decision: inscriptions[0].decision,
             classeCode: inscriptions[0].classe.code,
+            filiereCode: inscriptions[0].classe.filiere.code,
             anneeId: inscriptions[0].annee.id,
             anneeLibelle: inscriptions[0].annee.libelle,
           }
@@ -95,8 +109,9 @@ export class EtudiantsService {
         inscriptions: {
           orderBy: { annee: { dateDebut: 'asc' } },
           select: {
-            id: true, type: true, decision: true, annuleeLe: true, dateInscription: true,
-            classe: { select: { code: true } }, annee: { select: { id: true, libelle: true } },
+            id: true, type: true, decision: true, annuleeLe: true, dateInscription: true, piecesFournies: true, faitA: true,
+            classe: { select: { code: true, filiere: { select: { code: true, libelle: true } } } },
+            annee: { select: { id: true, libelle: true } },
           },
         },
         statutsAnnuels: { orderBy: { annee: { dateDebut: 'asc' } }, select: { etat: true, annee: { select: { libelle: true } } } },
@@ -110,7 +125,9 @@ export class EtudiantsService {
       ...presenterEtudiant(base),
       inscriptions: inscriptions.map((i) => ({
         id: i.id, type: i.type, decision: i.decision, annulee: i.annuleeLe !== null, dateInscription: i.dateInscription,
-        classeCode: i.classe.code, anneeId: i.annee.id, anneeLibelle: i.annee.libelle,
+        piecesFournies: i.piecesFournies, faitA: i.faitA,
+        classeCode: i.classe.code, filiereCode: i.classe.filiere.code, filiereLibelle: i.classe.filiere.libelle,
+        anneeId: i.annee.id, anneeLibelle: i.annee.libelle,
       })),
       statutsAnnuels: statutsAnnuels.map((s) => ({ anneeLibelle: s.annee.libelle, etat: s.etat })),
       compte,
@@ -132,11 +149,21 @@ export class EtudiantsService {
     if (dto.dateNaissance !== undefined) data.dateNaissance = verifierNaissance(dto.dateNaissance);
     if (dto.lieuNaissance !== undefined) data.lieuNaissance = dto.lieuNaissance;
     if (dto.nationalite !== undefined) data.nationalite = dto.nationalite;
+    if (dto.etatCivil !== undefined) data.etatCivil = dto.etatCivil;
     if (dto.telephone !== undefined) data.telephone = telephoneOuErreur(dto.telephone, 'Téléphone');
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.adresse !== undefined) data.adresse = dto.adresse;
-    if (dto.nomTuteur !== undefined) data.nomTuteur = dto.nomTuteur;
-    if (dto.telephoneTuteur !== undefined) data.telephoneTuteur = telephoneOuErreur(dto.telephoneTuteur, 'Téléphone du tuteur');
+    if (dto.contactUrgenceNom !== undefined) data.contactUrgenceNom = dto.contactUrgenceNom;
+    if (dto.contactUrgenceTelephone !== undefined) {
+      data.contactUrgenceTelephone = telephoneOuErreur(dto.contactUrgenceTelephone, "Téléphone du contact d'urgence");
+    }
+    if (dto.dernierDiplome !== undefined) data.dernierDiplome = dto.dernierDiplome;
+    if (dto.anneeObtention !== undefined) {
+      verifierAnneeObtention(dto.anneeObtention);
+      data.anneeObtention = dto.anneeObtention;
+    }
+    if (dto.etablissementOrigine !== undefined) data.etablissementOrigine = dto.etablissementOrigine;
+    if (dto.villePaysOrigine !== undefined) data.villePaysOrigine = dto.villePaysOrigine;
     if (Object.keys(data).length === 0) throw new BadRequestException('Aucune modification fournie.');
 
     const apres = await this.prisma.etudiant.update({ where: { id }, data, select: CHAMPS_ETUDIANT });
@@ -166,7 +193,10 @@ export class EtudiantsService {
   //  COMPTE ÉTUDIANT : lever un verrouillage (après trop d'échecs de connexion)
   // =====================================================================
   async deverrouillerCompte(acteur: PayloadAcces, institutId: number, id: string, ctx: ContexteRequete) {
-    const etudiant = await this.prisma.etudiant.findFirst({ where: { id, institutId, supprimeLe: null }, select: { id: true, compte: { select: { id: true } } } });
+    const etudiant = await this.prisma.etudiant.findFirst({
+      where: { id, institutId, supprimeLe: null },
+      select: { id: true, compte: { select: { id: true } } },
+    });
     if (!etudiant) throw new NotFoundException('Étudiant introuvable.');
     if (!etudiant.compte) throw new ConflictException("Cet étudiant n'a pas de compte (pas encore de matricule).");
 

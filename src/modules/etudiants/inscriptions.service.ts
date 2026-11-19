@@ -4,9 +4,10 @@ import { AuditService } from '../audit/audit.service.js';
 import type { ContexteRequete } from '../auth/auth.types.js';
 import type { PayloadAcces } from '../../common/types/jeton-acces.js';
 import { estViolationUnicite } from '../../common/utils/erreurs-prisma.js';
-import type { AjouterExistantDto, InscrireEtudiantDto, ReinscrireDto } from './dto/inscrire-etudiant.dto.js';
+import type { AjouterExistantDto, InscrireEtudiantDto, MettreAJourPiecesDto, ReinscrireDto } from './dto/inscrire-etudiant.dto.js';
 import {
-  CHAMPS_ETUDIANT, nomComplet, presenterEtudiant, resoudreAnnee, resoudreClasse, telephoneOuErreur, verifierNaissance,
+  CHAMPS_ETUDIANT, nomComplet, presenterEtudiant, resoudreAnnee, resoudreClasse,
+  telephoneOuErreur, verifierAnneeObtention, verifierNaissance,
 } from './etudiants.commun.js';
 import { MatriculeService } from './matricule.service.js';
 
@@ -34,10 +35,11 @@ export class InscriptionsService {
   private async creer(acteur: PayloadAcces, institutId: number, dto: DonneesCreation, type: TypeCreation, ctx: ContexteRequete) {
     // 1) Vérifications AVANT d'écrire quoi que ce soit
     const naissance = verifierNaissance(dto.dateNaissance);
+    verifierAnneeObtention(dto.anneeObtention);
     const telephone = telephoneOuErreur(dto.telephone, 'Téléphone');
-    const telephoneTuteur = telephoneOuErreur(dto.telephoneTuteur, 'Téléphone du tuteur');
+    const telephoneUrgence = telephoneOuErreur(dto.contactUrgenceTelephone, "Téléphone du contact d'urgence");
     const annee = await resoudreAnnee(this.prisma, institutId, dto.anneeId);
-    const classe = await resoudreClasse(this.prisma, dto.classeCode);
+    const classe = await resoudreClasse(this.prisma, institutId, dto.classeCode, dto.filiereCode);
 
     if (!dto.ignorerDoublon) {
       const doublon = await this.prisma.etudiant.findFirst({
@@ -69,22 +71,28 @@ export class InscriptionsService {
     try {
       const resultat = await this.prisma.$transaction(
         async (tx) => {
-          const matricule = dto.matricule ?? (await this.matricules.suivant(tx, institutId, annee, classe));
+          const matricule = dto.matricule ?? (await this.matricules.suivant(tx, institutId, annee));
           const etudiant = await tx.etudiant.create({
             data: {
               institutId, matricule,
               nom: dto.nom, postnom: dto.postnom ?? null, prenom: dto.prenom ?? null,
               sexe: dto.sexe, dateNaissance: naissance,
               lieuNaissance: dto.lieuNaissance ?? null, nationalite: dto.nationalite ?? null,
+              etatCivil: dto.etatCivil ?? null,
               telephone, email: dto.email ?? null, adresse: dto.adresse ?? null,
-              nomTuteur: dto.nomTuteur ?? null, telephoneTuteur,
+              contactUrgenceNom: dto.contactUrgenceNom ?? null, contactUrgenceTelephone: telephoneUrgence,
+              dernierDiplome: dto.dernierDiplome ?? null, anneeObtention: dto.anneeObtention ?? null,
+              etablissementOrigine: dto.etablissementOrigine ?? null, villePaysOrigine: dto.villePaysOrigine ?? null,
               statut: 'INSCRIT', estImporte: type === 'IMPORTE', creePar: acteur.sub,
             },
             select: CHAMPS_ETUDIANT,
           });
           const inscription = await tx.inscription.create({
-            data: { etudiantId: etudiant.id, anneeId: annee.id, classeId: classe.id, institutId, type, creePar: acteur.sub },
-            select: { id: true, type: true, decision: true },
+            data: {
+              etudiantId: etudiant.id, anneeId: annee.id, classeId: classe.id, institutId, type,
+              piecesFournies: dto.piecesFournies ?? [], faitA: dto.faitA ?? null, creePar: acteur.sub,
+            },
+            select: { id: true, type: true, decision: true, piecesFournies: true, faitA: true },
           });
           await tx.statutAnnuel.create({ data: { etudiantId: etudiant.id, anneeId: annee.id, etat: 'INSCRIT' } });
           await tx.compteEtudiant.create({ data: { etudiantId: etudiant.id } }); // connexion : matricule + date de naissance
@@ -96,12 +104,14 @@ export class InscriptionsService {
       await this.audit.enregistrer({
         action: type === 'IMPORTE' ? 'ETUDIANT_EXISTANT_AJOUTE' : 'ETUDIANT_INSCRIT',
         utilisateurId: acteur.sub, institutId, entite: 'etudiants', entiteId: resultat.etudiant.id,
-        details: { matricule: resultat.etudiant.matricule, classe: classe.code, annee: annee.libelle },
+        details: { matricule: resultat.etudiant.matricule, classe: classe.code, filiere: classe.filiere.code, annee: annee.libelle },
         ...ctx,
       });
       return {
         etudiant: presenterEtudiant(resultat.etudiant),
-        inscription: { ...resultat.inscription, classeCode: classe.code, anneeLibelle: annee.libelle },
+        inscription: {
+          ...resultat.inscription, classeCode: classe.code, filiereCode: classe.filiere.code, anneeLibelle: annee.libelle,
+        },
         compteCree: true,
       };
     } catch (erreur) {
@@ -123,7 +133,7 @@ export class InscriptionsService {
           where: { annuleeLe: null },
           orderBy: { annee: { dateDebut: 'desc' } },
           take: 1,
-          select: { classe: { select: { id: true, code: true, ordre: true } } },
+          select: { classe: { select: { id: true, code: true, ordre: true, filiereId: true, filiere: { select: { code: true } } } } },
         },
       },
     });
@@ -134,7 +144,7 @@ export class InscriptionsService {
     const derniere = etudiant.inscriptions[0];
     if (!derniere) throw new BadRequestException("Aucune inscription précédente : utilisez l'inscription ou « étudiant existant ».");
 
-    const classe = await this.classeSelonDecision(dto, derniere.classe);
+    const classe = await this.classeSelonDecision(institutId, dto, derniere.classe);
     const annee = await resoudreAnnee(this.prisma, institutId, dto.anneeId);
 
     const dejaInscrit = await this.prisma.inscription.findUnique({
@@ -145,8 +155,11 @@ export class InscriptionsService {
 
     const inscription = await this.prisma.$transaction(async (tx) => {
       const cree = await tx.inscription.create({
-        data: { etudiantId, anneeId: annee.id, classeId: classe.id, institutId, type: 'REINSCRIPTION', decision: dto.decision, creePar: acteur.sub },
-        select: { id: true, type: true, decision: true },
+        data: {
+          etudiantId, anneeId: annee.id, classeId: classe.id, institutId, type: 'REINSCRIPTION', decision: dto.decision,
+          piecesFournies: dto.piecesFournies ?? [], faitA: dto.faitA ?? null, creePar: acteur.sub,
+        },
+        select: { id: true, type: true, decision: true, piecesFournies: true, faitA: true },
       });
       await tx.statutAnnuel.upsert({
         where: { etudiantId_anneeId: { etudiantId, anneeId: annee.id } },
@@ -168,20 +181,51 @@ export class InscriptionsService {
     };
   }
 
-  /** PASSAGE = classe supérieure, REDOUBLEMENT = même classe, REPRISE = classe choisie par le SGAC. */
-  private async classeSelonDecision(dto: ReinscrireDto, derniere: { id: number; code: string; ordre: number }) {
+  // =====================================================================
+  //  PIÈCES REMISES (section 4 de la fiche)
+  // =====================================================================
+  async mettreAJourPieces(acteur: PayloadAcces, institutId: number, etudiantId: string, dto: MettreAJourPiecesDto, ctx: ContexteRequete) {
+    const inscription = await this.prisma.inscription.findFirst({
+      where: {
+        etudiantId, institutId, annuleeLe: null,
+        ...(dto.anneeId ? { anneeId: dto.anneeId } : { annee: { estActive: true } }),
+      },
+      select: { id: true, piecesFournies: true, faitA: true, annee: { select: { libelle: true, estCloturee: true } } },
+    });
+    if (!inscription) throw new NotFoundException("Aucune inscription trouvée pour cet étudiant dans cette année scolaire.");
+    if (inscription.annee.estCloturee) throw new ConflictException('Année scolaire clôturée : elle est en lecture seule.');
+
+    const apres = await this.prisma.inscription.update({
+      where: { id: inscription.id },
+      data: { piecesFournies: dto.piecesFournies, ...(dto.faitA !== undefined ? { faitA: dto.faitA } : {}) },
+      select: { piecesFournies: true, faitA: true },
+    });
+    await this.audit.enregistrer({
+      action: 'PIECES_MODIFIEES', utilisateurId: acteur.sub, institutId, entite: 'inscriptions', entiteId: inscription.id,
+      avant: { piecesFournies: inscription.piecesFournies, faitA: inscription.faitA }, apres, ...ctx,
+    });
+    return { anneeLibelle: inscription.annee.libelle, ...apres };
+  }
+
+  /** PASSAGE = classe supérieure (même filière), REDOUBLEMENT = même classe, REPRISE = classe choisie par le SGAC. */
+  private async classeSelonDecision(
+    institutId: number,
+    dto: ReinscrireDto,
+    derniere: { id: number; code: string; ordre: number; filiereId: number; filiere: { code: string } },
+  ): Promise<{ id: number; code: string }> {
     if (dto.decision === 'REPRISE') {
       if (!dto.classeCode) throw new BadRequestException('Pour une reprise, indiquez la classe (classeCode).');
-      return resoudreClasse(this.prisma, dto.classeCode);
+      return resoudreClasse(this.prisma, institutId, dto.classeCode, dto.filiereCode ?? derniere.filiere.code);
     }
 
-    let classe: { id: number; code: string; ordre: number } | null = derniere;
+    let classe: { id: number; code: string } = derniere;
     if (dto.decision === 'PASSAGE') {
-      classe = await this.prisma.classe.findFirst({
-        where: { ordre: derniere.ordre + 1, actif: true },
-        select: { id: true, code: true, ordre: true },
+      const suivante = await this.prisma.classe.findFirst({
+        where: { filiereId: derniere.filiereId, ordre: derniere.ordre + 1, actif: true },
+        select: { id: true, code: true },
       });
-      if (!classe) throw new BadRequestException("Il n'y a pas de classe supérieure : l'étudiant est au dernier niveau.");
+      if (!suivante) throw new BadRequestException("Il n'y a pas de classe supérieure : l'étudiant est au dernier niveau.");
+      classe = suivante;
     }
     if (dto.classeCode && dto.classeCode !== classe.code) {
       throw new BadRequestException(`Incohérent : ${dto.decision} mène à ${classe.code}, pas à ${dto.classeCode}.`);
