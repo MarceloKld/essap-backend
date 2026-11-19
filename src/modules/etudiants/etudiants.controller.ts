@@ -1,5 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, StreamableFile,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { InstitutCourant } from '../../common/decorators/institut-courant.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -7,10 +10,12 @@ import { UtilisateurCourant } from '../../common/decorators/utilisateur-courant.
 import type { PayloadAcces } from '../../common/types/jeton-acces.js';
 import { contexteRequete } from '../../common/utils/contexte-requete.js';
 import { ChangerStatutDto } from './dto/changer-statut.dto.js';
+import { FicheRemplieDto, FicheViergeDto } from './dto/fiche.dto.js';
+import { AjouterExistantDto, InscrireEtudiantDto, MettreAJourPiecesDto, ReinscrireDto } from './dto/inscrire-etudiant.dto.js';
 import { ListerEtudiantsDto } from './dto/lister-etudiants.dto.js';
 import { ModifierEtudiantDto } from './dto/modifier-etudiant.dto.js';
-import { AjouterExistantDto, InscrireEtudiantDto, ReinscrireDto } from './dto/inscrire-etudiant.dto.js';
 import { EtudiantsService } from './etudiants.service.js';
+import { FicheInscriptionService } from './fiche/fiche-inscription.service.js';
 import { InscriptionsService } from './inscriptions.service.js';
 
 /**
@@ -25,6 +30,7 @@ export class EtudiantsController {
   constructor(
     private readonly etudiants: EtudiantsService,
     private readonly inscriptions: InscriptionsService,
+    private readonly fiches: FicheInscriptionService,
   ) {}
 
   @Post()
@@ -39,7 +45,7 @@ export class EtudiantsController {
     return this.inscriptions.inscrire(acteur, institutId, dto, contexteRequete(req));
   }
 
-  // Cette route doit être AVANT les routes « :id ».
+  // Les routes « fixes » (existants, fiche-inscription-vierge) doivent être AVANT les routes « :id ».
   @Post('existants')
   @Roles('DG', 'SGAC')
   @ApiOperation({ summary: 'Ajouter un étudiant EXISTANT (sans frais d’inscription, ancien matricule conservable)' })
@@ -52,9 +58,20 @@ export class EtudiantsController {
     return this.inscriptions.ajouterExistant(acteur, institutId, dto, contexteRequete(req));
   }
 
+  @Get('fiche-inscription-vierge')
+  @Roles('DG', 'SGAC')
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ defaut: { limit: 30, ttl: 60_000 } }) // fabriquer un PDF coûte du processeur
+  @ApiProduces('application/pdf')
+  @ApiOperation({ summary: "Fiche d'inscription VIERGE en PDF (à imprimer pour les candidats)" })
+  async ficheVierge(@InstitutCourant() institutId: number, @Query() q: FicheViergeDto) {
+    const { pdf, nomFichier } = await this.fiches.vierge(institutId, q.filiereCode, q.anneeId);
+    return new StreamableFile(pdf, { type: 'application/pdf', disposition: `inline; filename="${nomFichier}"`, length: pdf.length });
+  }
+
   @Get()
   @Roles('DG', 'SGAC', 'ADMIN_BUDGET')
-  @ApiOperation({ summary: 'Lister les étudiants (pagination, recherche, filtres année / classe / statut / sexe)' })
+  @ApiOperation({ summary: 'Lister les étudiants (pagination, recherche, filtres année / classe / filière / statut / sexe)' })
   lister(@InstitutCourant() institutId: number, @Query() filtres: ListerEtudiantsDto) {
     return this.etudiants.lister(institutId, filtres);
   }
@@ -90,6 +107,36 @@ export class EtudiantsController {
     @Req() req: Request,
   ) {
     return this.inscriptions.reinscrire(acteur, institutId, id, dto, contexteRequete(req));
+  }
+
+  @Put(':id/pieces')
+  @Roles('DG', 'SGAC')
+  @ApiOperation({ summary: 'Mettre à jour les pièces remises (section 4 de la fiche) et le « fait à »' })
+  pieces(
+    @UtilisateurCourant() acteur: PayloadAcces,
+    @InstitutCourant() institutId: number,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MettreAJourPiecesDto,
+    @Req() req: Request,
+  ) {
+    return this.inscriptions.mettreAJourPieces(acteur, institutId, id, dto, contexteRequete(req));
+  }
+
+  @Get(':id/fiche-inscription')
+  @Roles('DG', 'SGAC')
+  @Header('Cache-Control', 'no-store') // données personnelles : jamais en cache
+  @Throttle({ defaut: { limit: 30, ttl: 60_000 } })
+  @ApiProduces('application/pdf')
+  @ApiOperation({ summary: "Fiche d'inscription REMPLIE en PDF (générée à la volée, jamais stockée)" })
+  async fiche(
+    @UtilisateurCourant() acteur: PayloadAcces,
+    @InstitutCourant() institutId: number,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() q: FicheRemplieDto,
+    @Req() req: Request,
+  ) {
+    const { pdf, nomFichier } = await this.fiches.remplie(acteur, institutId, id, q.anneeId, contexteRequete(req));
+    return new StreamableFile(pdf, { type: 'application/pdf', disposition: `inline; filename="${nomFichier}"`, length: pdf.length });
   }
 
   @Post(':id/statut')

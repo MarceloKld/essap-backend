@@ -13,6 +13,7 @@ import { EtudiantsModule } from './modules/etudiants/etudiants.module.js';
 import { InstitutsModule } from './modules/instituts/instituts.module.js';
 import { SanteModule } from './modules/sante/sante.module.js';
 import { ScolariteModule } from './modules/scolarite/scolarite.module.js';
+import { StructureModule } from './modules/structure/structure.module.js';
 import { UtilisateursModule } from './modules/utilisateurs/utilisateurs.module.js';
 
 @Module({
@@ -38,6 +39,7 @@ import { UtilisateursModule } from './modules/utilisateurs/utilisateurs.module.j
     InstitutsModule,
     UtilisateursModule,
     ScolariteModule,
+    StructureModule,
     EtudiantsModule,
     SanteModule,
   ],
