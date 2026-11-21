@@ -39,7 +39,7 @@ export default async function peuplerAcces(prisma: Client): Promise<void> {
     create: {
       institutId: institut.id,
       cle: 'matricule.format',
-      valeur: { prefixe: 'DEMO', longueurSequence: 4 },
+      valeur: { prefixe: 'DM', longueurSequence: 4 },
       description: 'Préfixe + année + classe + numéro de séquence',
     },
   });
@@ -84,11 +84,11 @@ export default async function peuplerAcces(prisma: Client): Promise<void> {
 
   // --- Étudiants fictifs, chacun avec son compte (connexion = matricule + date de naissance) ---
   const etudiants = [
-    { matricule: 'DM26L101', nom: 'Mukendi', postnom: 'Kabeya', prenom: 'Grace', sexe: 'F', naissance: '2004-03-15' },
-    { matricule: 'DM26L102', nom: 'Tshibangu', postnom: 'Ngoy', prenom: 'Patrick', sexe: 'M', naissance: '2003-11-02' },
-    { matricule: 'DM26L103', nom: 'Banza', postnom: 'Mwamba', prenom: 'Sarah', sexe: 'F', naissance: '2005-07-21' },
-    { matricule: 'DM26L201', nom: 'Kalala', postnom: 'Ilunga', prenom: 'Jonathan', sexe: 'M', naissance: '2002-01-30' },
-    { matricule: 'DM26L301', nom: 'Mbuyi', postnom: 'Tshimanga', prenom: 'Ruth', sexe: 'F', naissance: '2001-09-09' },
+    { matricule: 'DM260001', nom: 'Mukendi', postnom: 'Kabeya', prenom: 'Grace', sexe: 'F', naissance: '2004-03-15' },
+    { matricule: 'DM260002', nom: 'Tshibangu', postnom: 'Ngoy', prenom: 'Patrick', sexe: 'M', naissance: '2003-11-02' },
+    { matricule: 'DM260003', nom: 'Banza', postnom: 'Mwamba', prenom: 'Sarah', sexe: 'F', naissance: '2005-07-21' },
+    { matricule: 'DM260004', nom: 'Kalala', postnom: 'Ilunga', prenom: 'Jonathan', sexe: 'M', naissance: '2002-01-30' },
+    { matricule: 'DM260005', nom: 'Mbuyi', postnom: 'Tshimanga', prenom: 'Ruth', sexe: 'F', naissance: '2001-09-09' },
   ] as const;
 
   for (const e of etudiants) {
@@ -115,5 +115,5 @@ export default async function peuplerAcces(prisma: Client): Promise<void> {
 
   console.log('  ✔ Accès : 4 comptes de personnel, 5 étudiants.');
   console.log('    Mot de passe de test (personnel) :', MOT_DE_PASSE_DEV);
-  console.log('    Étudiant : DM26L101 + 2004-03-15');
+  console.log('    Étudiant : DM260001 + 2004-03-15');
 }

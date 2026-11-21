@@ -245,11 +245,6 @@ export class InstitutsService {
       if (!tel2) throw new BadRequestException('Deuxième téléphone invalide.');
       data.telephone2 = tel2;
     }
-    if (dto.telephone2 !== undefined) {
-      const tel2 = normaliserTelephone(dto.telephone2);
-      if (!tel2) throw new BadRequestException('Deuxième téléphone invalide.');
-      data.telephone2 = tel2;
-    }
     if (Object.keys(data).length === 0) throw new BadRequestException('Aucune modification fournie.');
 
     const apres = await this.prisma.institut.update({ where: { id }, data, select: CHAMPS_INSTITUT });
